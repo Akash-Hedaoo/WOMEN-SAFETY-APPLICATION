@@ -117,7 +117,7 @@ app.use('/api/sos', sosLimiter);
 // ─── Health Check ────────────────────────────────
 app.get('/', (req, res) => {
   res.json({
-    message: 'Nirbhaya API',
+    message: 'Safe-Era API',
     status: 'OK',
     version: '2.0.0',
     timestamp: new Date().toISOString(),
@@ -146,7 +146,7 @@ app.use(errorMiddleware);
 // ─── Start Server ────────────────────────────────
 const PORT = process.env.PORT || 5001;
 httpServer.listen(PORT, () => {
-  console.log(`\n[API] Nirbhaya API`);
+  console.log(`\n[API] Safe-Era API`);
   console.log(`[SERVER] Server: http://localhost:${PORT}`);
   console.log(`[ENV] Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`[DB] MongoDB: Connected\n`);

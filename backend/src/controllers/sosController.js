@@ -8,7 +8,7 @@ const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_T
   : null;
 
 const sendSMSToGuardian = async (guardian, alertData) => {
-  const smsBody = `EMERGENCY ALERT from Nirbhaya\n\n${alertData.userName} needs immediate help!\n\nLocation: ${alertData.googleMapsLink}\n\nCall them: ${alertData.userPhone}\n\nThis alert was sent automatically by Nirbhaya safety app.`;
+  const smsBody = `EMERGENCY ALERT from Safe-Era\n\n${alertData.userName} needs immediate help!\n\nLocation: ${alertData.googleMapsLink}\n\nCall them: ${alertData.userPhone}\n\nThis alert was sent automatically by Safe-Era safety app.`;
   
   if (!twilioClient) {
     console.log('[MOCK SMS] Would send to:', guardian.guardianPhone, 'Message:', smsBody);

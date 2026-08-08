@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 const FAQ_DATA = [
   {
-    question: 'Is Nirbhaya free to use?',
+    question: 'Is Safe-Era free to use?',
     answer: 'Yes! Our Basic Haven plan is completely free. You get access to the safety map, standard SOS alerts, and up to 2 guardians at no cost.',
   },
   {
@@ -18,8 +18,8 @@ const FAQ_DATA = [
     answer: 'Premium and Annual plan users can download offline maps for their region. The SOS feature can also send an SMS alert as a fallback when internet is unavailable.',
   },
   {
-    question: 'How is Nirbhaya different from other safety apps?',
-    answer: 'Nirbhaya is built specifically for Indian women with India-specific data — crowdsourced safety ratings for Indian neighborhoods, integration with 112, and a UI designed for quick one-hand use in stressful situations.',
+    question: 'How is Safe-Era different from other safety apps?',
+    answer: 'Safe-Era is built specifically for Indian women with India-specific data — crowdsourced safety ratings for Indian neighborhoods, integration with 112, and a UI designed for quick one-hand use in stressful situations.',
   },
   {
     question: 'Is my personal data safe?',
@@ -53,7 +53,7 @@ export default function FAQSection() {
       <div className="max-w-[1440px] mx-auto px-6 md:px-12">
         <div className="text-center mb-16">
           <h2 className="font-headline text-4xl lg:text-5xl font-bold text-[#2c2a1e] tracking-tight mb-4">Frequently Asked Questions</h2>
-          <p className="font-body text-lg text-[#3a3520]/60">Everything you need to know about Nirbhaya.</p>
+          <p className="font-body text-lg text-[#3a3520]/60">Everything you need to know about Safe-Era.</p>
         </div>
         <div className="max-w-3xl mx-auto rounded-2xl border border-[#8d9d4f]/8 overflow-hidden">
           {FAQ_DATA.map((item, i) => (

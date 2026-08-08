@@ -25,15 +25,15 @@ export const ROUTES = {
     SETTINGS: '/settings',
 };
 
-export const APP_NAME = 'Nirbhaya';
-export const API_BASE_URL = import.meta.env.PROD ? 'https://nirbhaya-pqv4.onrender.com' : '';
+export const APP_NAME = 'Safe-Era';
+export const API_BASE_URL = import.meta.env.PROD ? 'https://safe-era-pqv4.onrender.com' : '';
 
 export const MOCK_USER = {
-    name: 'Veda Menon',
-    email: 'veda.menon@example.com',
+    name: 'Anushka Prasad',
+    email: 'anushka.prasad@example.com',
     phone: '+91 9876543210',
     emergencyContact: {
-        name: 'Appa',
+        name: 'Akash Prasad',
         phone: '+91 9823456781'
     }
 };

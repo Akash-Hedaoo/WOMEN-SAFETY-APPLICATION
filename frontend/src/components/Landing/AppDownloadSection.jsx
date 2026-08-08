@@ -22,7 +22,7 @@ export default function AppDownloadSection() {
                 <div className="premium-panel-strong mx-auto w-full max-w-sm p-4">
                     <div className="rounded-[22px] border border-white/10 bg-slate-950/70 p-4">
                         <div className="mb-4 flex items-center justify-between">
-                            <span className="text-sm font-semibold text-white">Nirbhaya mobile preview</span>
+                            <span className="text-sm font-semibold text-white">Safe-Era mobile preview</span>
                             <span className="premium-chip">Live</span>
                         </div>
                         <div className="rounded-[20px] border border-white/10 bg-gradient-to-b from-violet-500/20 to-pink-500/10 p-6">

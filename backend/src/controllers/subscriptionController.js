@@ -5,7 +5,7 @@ const User = require('../models/User');
 
 const PLANS = {
   premium: { amount: 19900, label: 'Premium Monthly', days: 30, amountInRupees: 199 },
-  annual: { amount: 149900, label: 'Nirbhaya Annual', days: 365, amountInRupees: 1499 }
+  annual: { amount: 149900, label: 'Safe-Era Annual', days: 365, amountInRupees: 1499 }
 };
 
 let razorpay = null;
@@ -35,7 +35,7 @@ const createOrder = async (req, res) => {
       return res.status(503).json({ success: false, message: "Payment gateway not configured. Please contact support." });
     }
 
-    const receipt = "Nirbhaya_" + req.userId + "_" + Date.now();
+    const receipt = "Safe-Era_" + req.userId + "_" + Date.now();
 
     const order = await razorpay.orders.create({
       amount: PLANS[plan].amount,
@@ -110,7 +110,7 @@ const verifyPayment = async (req, res) => {
 
     return res.status(200).json({ 
       success: true, 
-      message: "Payment verified. Welcome to Nirbhaya Premium!", 
+      message: "Payment verified. Welcome to Safe-Era Premium!", 
       subscription, 
       invoiceNumber 
     });

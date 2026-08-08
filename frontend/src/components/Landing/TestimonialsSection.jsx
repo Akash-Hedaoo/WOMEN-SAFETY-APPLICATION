@@ -2,9 +2,9 @@ import React from 'react';
 import { Quote, Star } from 'lucide-react';
 
 const testimonials = [
-    { name: 'Veda Menon', role: 'Student, Hyderabad', quote: 'The interface is calmer, clearer, and feels more trustworthy. The SOS path is now obvious.', img: 'https://i.pravatar.cc/100?img=32' },
-    { name: 'Nandini Rao', role: 'Engineer, Kochi', quote: 'It looks like a real premium SaaS product instead of a simple utility. The experience feels much stronger.', img: 'https://i.pravatar.cc/100?img=33' },
-    { name: 'Tara Sen', role: 'Traveler, Jaipur', quote: 'The new hierarchy and surfaces make it much easier to focus when navigating quickly.', img: 'https://i.pravatar.cc/100?img=34' },
+    { name: 'Hrishika Sharma', role: 'Student, Hyderabad', quote: 'The interface is calmer, clearer, and feels more trustworthy. The SOS path is now obvious.', img: 'https://i.pravatar.cc/100?img=32' },
+    { name: 'Megha Verma', role: 'Engineer, Pune', quote: 'It looks like a real premium SaaS product instead of a simple utility. The experience feels much stronger.', img: 'https://i.pravatar.cc/100?img=33' },
+    { name: 'Arya Singh', role: 'Traveler, Mumbai', quote: 'The new hierarchy and surfaces make it much easier to focus when navigating quickly.', img: 'https://i.pravatar.cc/100?img=34' },
 ];
 
 export default function TestimonialsSection() {

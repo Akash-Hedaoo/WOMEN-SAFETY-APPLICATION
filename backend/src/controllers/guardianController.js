@@ -1,30 +1,30 @@
 const Guardian = require('../models/Guardian');
 const twilio = require('twilio');
 
-const twilioClient = process.env.TWILIO_ACCOUNT_SID 
-  ? require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN) 
+const twilioClient = process.env.TWILIO_ACCOUNT_SID
+  ? require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
   : null;
 
 const sendSMS = async (to, body) => {
-  if (!twilioClient) { 
-    console.log('[MOCK SMS to', to, ']:', body); 
-    return; 
+  if (!twilioClient) {
+    console.log('[MOCK SMS to', to, ']:', body);
+    return;
   }
-  try { 
-    await twilioClient.messages.create({ 
-      body, 
-      from: process.env.TWILIO_PHONE_NUMBER, 
-      to: '+91' + to 
-    }); 
-  } catch (e) { 
-    console.error('SMS error:', e.message); 
+  try {
+    await twilioClient.messages.create({
+      body,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: '+91' + to
+    });
+  } catch (e) {
+    console.error('SMS error:', e.message);
   }
 };
 
 const getGuardians = async (req, res) => {
   try {
     const guardians = await Guardian.find({ userId: req.userId, isActive: true }).sort({ addedAt: -1 });
-    
+
     const now = Date.now();
     const guardiansWithOTPStatus = guardians.map(g => {
       const gObj = g.toObject();
@@ -35,11 +35,11 @@ const getGuardians = async (req, res) => {
     const verified = guardiansWithOTPStatus.filter(g => g.isVerified);
     const pending = guardiansWithOTPStatus.filter(g => !g.isVerified);
 
-    return res.status(200).json({ 
-      success: true, 
+    return res.status(200).json({
+      success: true,
       verified,
       pending,
-      total: guardiansWithOTPStatus.length 
+      total: guardiansWithOTPStatus.length
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -49,7 +49,7 @@ const getGuardians = async (req, res) => {
 const addGuardian = async (req, res) => {
   try {
     const guardiansCount = await Guardian.countDocuments({ userId: req.userId, isActive: true });
-    
+
     if (req.user.plan === 'free' && guardiansCount >= 3) {
       return res.status(400).json({
         success: false,
@@ -58,7 +58,7 @@ const addGuardian = async (req, res) => {
     }
 
     const { guardianName, guardianPhone, relation } = req.body;
-    
+
     if (!guardianName || !guardianPhone || !relation) {
       return res.status(400).json({ success: false, message: "Please provide all required fields" });
     }
@@ -76,25 +76,25 @@ const addGuardian = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
 
-    const guardian = new Guardian({ 
-      userId: req.userId, 
-      guardianName, 
-      guardianPhone, 
+    const guardian = new Guardian({
+      userId: req.userId,
+      guardianName,
+      guardianPhone,
       relation,
       isVerified: false,
       verificationOTP: otp,
       otpExpiry
     });
-    
+
     await guardian.save();
 
-    const smsBody = `Hi ${guardianName}! ${req.user.name} has added you as a safety guardian on Nirbhaya. Your verification code is: ${otp}. Reply with this code to ${req.user.name} to confirm. Valid for 15 minutes.`;
-    
+    const smsBody = `Hi ${guardianName}! ${req.user.name} has added you as a safety guardian on Safe-Era. Your verification code is: ${otp}. Reply with this code to ${req.user.name} to confirm. Valid for 15 minutes.`;
+
     await sendSMS(guardianPhone, smsBody);
 
-    return res.status(201).json({ 
-      success: true, 
-      message: "Guardian added. OTP sent to their number for verification.", 
+    return res.status(201).json({
+      success: true,
+      message: "Guardian added. OTP sent to their number for verification.",
       guardian,
       otpSent: true
     });
@@ -108,7 +108,7 @@ const verifyGuardian = async (req, res) => {
     const { guardianId, otp } = req.body;
 
     const guardian = await Guardian.findOne({ _id: guardianId, userId: req.userId });
-    
+
     if (!guardian) {
       return res.status(404).json({ success: false, message: "Guardian not found" });
     }
@@ -124,7 +124,7 @@ const verifyGuardian = async (req, res) => {
     }
 
     guardian.otpAttempts += 1;
-    
+
     if (guardian.otpAttempts >= 5) {
       await guardian.save();
       return res.status(429).json({ success: false, message: "Too many attempts. Please resend OTP." });
@@ -143,7 +143,7 @@ const verifyGuardian = async (req, res) => {
 
     await guardian.save();
 
-    const smsBody = `You are now a verified safety guardian for ${req.user.name} on Nirbhaya. You will receive emergency alerts if ${req.user.name} triggers SOS.`;
+    const smsBody = `You are now a verified safety guardian for ${req.user.name} on Safe-Era. You will receive emergency alerts if ${req.user.name} triggers SOS.`;
     await sendSMS(guardian.guardianPhone, smsBody);
 
     return res.status(200).json({ success: true, message: "Guardian verified successfully", guardian });
@@ -157,7 +157,7 @@ const resendOTP = async (req, res) => {
     const { guardianId } = req.body;
 
     const guardian = await Guardian.findOne({ _id: guardianId, userId: req.userId });
-    
+
     if (!guardian) {
       return res.status(404).json({ success: false, message: "Guardian not found" });
     }
@@ -182,7 +182,7 @@ const resendOTP = async (req, res) => {
 
     await guardian.save();
 
-    const smsBody = `Hi ${guardian.guardianName}! ${req.user.name} has added you as a safety guardian on Nirbhaya. Your new verification code is: ${otp}. Reply with this code to ${req.user.name} to confirm. Valid for 15 minutes.`;
+    const smsBody = `Hi ${guardian.guardianName}! ${req.user.name} has added you as a safety guardian on Safe-Era. Your new verification code is: ${otp}. Reply with this code to ${req.user.name} to confirm. Valid for 15 minutes.`;
     await sendSMS(guardian.guardianPhone, smsBody);
 
     return res.status(200).json({ success: true, message: "New OTP sent to guardian's phone" });
@@ -219,7 +219,7 @@ const updateGuardian = async (req, res) => {
 const sendTestAlert = async (req, res) => {
   try {
     const guardian = await Guardian.findOne({ _id: req.params.id, userId: req.userId });
-    
+
     if (!guardian) {
       return res.status(404).json({ success: false, message: "Guardian not found" });
     }
@@ -235,7 +235,7 @@ const sendTestAlert = async (req, res) => {
       }
     }
 
-    const smsBody = `TEST ALERT from Nirbhaya\n\nThis is a test from ${req.user.name}. If you receive this, you are set up to receive real emergency alerts.\n\nNo action needed.`;
+    const smsBody = `TEST ALERT from Safe-Era\n\nThis is a test from ${req.user.name}. If you receive this, you are set up to receive real emergency alerts.\n\nNo action needed.`;
     await sendSMS(guardian.guardianPhone, smsBody);
 
     guardian.lastAlertedAt = new Date();

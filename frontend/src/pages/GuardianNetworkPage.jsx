@@ -33,9 +33,9 @@ function VerificationButton({ guardian, onVerify }) {
 
 export default function GuardianNetworkPage() {
   const [guardians, setGuardians] = useState([
-    { id: 1, name: 'Appa', phone: '+91 9823456781', relationship: 'Appa', verified: true, lastAlert: '2 days ago' },
-    { id: 2, name: 'Ishaan', phone: '+91 9876543211', relationship: 'Friend', verified: true, lastAlert: 'Never' },
-    { id: 3, name: 'Nimrat', phone: '+91 9876543212', relationship: 'Behen', verified: false, lastAlert: 'Never' },
+    { id: 1, name: 'Akash Prasad', phone: '+91 9823456781', relationship: 'Father', verified: true, lastAlert: '2 days ago' },
+    { id: 2, name: 'Neeraj Sharma', phone: '+91 9876543211', relationship: 'Brother', verified: true, lastAlert: 'Never' },
+    { id: 3, name: 'Shilpa Mehta', phone: '+91 9876543212', relationship: 'Friend', verified: false, lastAlert: 'Never' },
   ]);
   const [formData, setFormData] = useState({ name: '', phone: '', relationship: 'Friend' });
   const [editingGuardian, setEditingGuardian] = useState(null);
@@ -100,7 +100,7 @@ export default function GuardianNetworkPage() {
               <input className="premium-input" value={editingGuardian.name} onChange={(e) => setEditingGuardian({ ...editingGuardian, name: e.target.value })} />
               <input className="premium-input" value={editingGuardian.phone} onChange={(e) => setEditingGuardian({ ...editingGuardian, phone: e.target.value })} />
               <select className="premium-select" value={editingGuardian.relationship} onChange={(e) => setEditingGuardian({ ...editingGuardian, relationship: e.target.value })}>
-                <option>Appa</option><option>Ammi</option><option>Behen</option><option>Bhai</option><option>Dost</option><option>Partner</option><option>Other</option>
+                <option>Father</option><option>Mother</option><option>Brother</option><option>Sister</option><option>Friend</option><option>Partner</option><option>Other</option>
               </select>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setEditingGuardian(null)} className="btn-secondary flex-1">Cancel</button>
@@ -133,7 +133,7 @@ export default function GuardianNetworkPage() {
               <input className="premium-input" placeholder="Full name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
               <input className="premium-input" placeholder="+91 phone number" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
               <select className="premium-select" value={formData.relationship} onChange={(e) => setFormData({ ...formData, relationship: e.target.value })}>
-                <option>Appa</option><option>Ammi</option><option>Behen</option><option>Bhai</option><option>Dost</option><option>Partner</option><option>Other</option>
+                <option>Father</option><option>Mother</option><option>Brother</option><option>Sister</option><option>Friend</option><option>Partner</option><option>Other</option>
               </select>
               <button className="btn-primary w-full justify-center" type="submit"><Plus className="h-4 w-4" /> Add guardian</button>
             </form>

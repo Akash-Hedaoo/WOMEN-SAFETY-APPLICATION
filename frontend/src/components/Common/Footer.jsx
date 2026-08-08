@@ -14,7 +14,7 @@ export default function Footer() {
                                 <Shield className="h-5 w-5 text-white" />
                             </div>
                             <div>
-                                <p className="font-headline text-2xl font-semibold tracking-tight text-white">Nirbhaya</p>
+                                <p className="font-headline text-2xl font-semibold tracking-tight text-white">Safe-Era</p>
                                 <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400 font-semibold">Premium Safety Platform</p>
                             </div>
                         </div>
@@ -51,7 +51,7 @@ export default function Footer() {
                 </div>
 
                 <div className="mt-12 flex flex-col gap-3 border-t border-white/10 pt-6 text-xs text-slate-400 md:flex-row md:items-center md:justify-between">
-                    <p>© 2026 Nirbhaya. All rights reserved.</p>
+                    <p>© 2026 Safe-Era. All rights reserved.</p>
                     <p>Designed as a premium privacy-first SaaS experience.</p>
                 </div>
             </div>

@@ -60,7 +60,7 @@ export default function Login() {
                 <Shield className="h-5 w-5 text-white" />
               </div>
               <div>
-                <p className="font-headline text-xl font-semibold text-white">Nirbhaya</p>
+                <p className="font-headline text-xl font-semibold text-white">Safe-Era</p>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">Secure access</p>
               </div>
             </Link>

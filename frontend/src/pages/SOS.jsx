@@ -8,8 +8,8 @@ export default function SOSPage() {
   const [toastMessage, setToastMessage] = useState(null);
 
   const guardians = [
-    { id: 1, name: 'Appa', initial: 'A', color: 'bg-violet-500', status: 'Active ✓' },
-    { id: 2, name: 'Ishaan', initial: 'I', color: 'bg-cyan-500', status: 'Pending' },
+    { id: 1, name: 'Akash Prasad', initial: 'A', color: 'bg-violet-500', status: 'Active ✓' },
+    { id: 2, name: 'Devansh Prasad', initial: 'D', color: 'bg-cyan-500', status: 'Pending' },
   ];
 
   const logs = [

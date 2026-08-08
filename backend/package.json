@@ -1,7 +1,7 @@
 {
-  "name": "nirbhaya-backend",
+  "name": "safe-era-backend",
   "version": "1.0.0",
-  "description": "Backend for Nirbhaya - Women Safety Platform",
+  "description": "Backend for Safe-Era - Women Safety Platform",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

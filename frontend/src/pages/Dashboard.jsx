@@ -77,7 +77,7 @@ export default function Dashboard() {
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-violet-200">Dashboard</p>
           <h1 className="mt-3 font-headline text-4xl font-semibold text-white md:text-5xl">
-            Welcome back, {user?.name || 'Veda'}
+            Welcome back, {user?.name || 'Atharva'}
           </h1>
           <p className="mt-3 max-w-2xl text-slate-300">
             Your safety workspace is active, monitored, and ready. This redesign keeps the same data while lifting the presentation.

@@ -56,7 +56,7 @@ export default function Navbar() {
                         <Shield className="h-5 w-5 text-white" />
                     </div>
                     <div className="leading-tight">
-                        <div className="font-headline text-lg font-semibold tracking-tight text-white">Nirbhaya</div>
+                        <div className="font-headline text-lg font-semibold tracking-tight text-white">Safe-Era</div>
                         <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-400">Guardian network</div>
                     </div>
                 </Link>

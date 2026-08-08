@@ -4,7 +4,7 @@ import { Plus, Minus, Shield, MapPin, Bell, Lock, Users, CreditCard } from "luci
 import { Link } from "react-router-dom";
 
 const items = [
-  { id: "1", icon: Shield, title: "Is Nirbhaya free to use?", content: "Yes. The core safety experience remains free, including the map, SOS alerts, and a limited guardian set." },
+  { id: "1", icon: Shield, title: "Is Safe-Era free to use?", content: "Yes. The core safety experience remains free, including the map, SOS alerts, and a limited guardian set." },
   { id: "2", icon: Bell, title: "How does SOS work?", content: "A single tap sends your location and emergency state to the trusted network with no extra steps." },
   { id: "3", icon: Users, title: "What is the Guardian Network?", content: "It is a private list of trusted contacts who receive alerts and journey visibility when you need it." },
   { id: "4", icon: MapPin, title: "How accurate is the map?", content: "The map is built to surface verified points and nearby support locations with a clean, real-time presentation." },
@@ -12,7 +12,7 @@ const items = [
   { id: "6", icon: CreditCard, title: "Can I cancel Premium anytime?", content: "Yes. Billing changes are handled through the existing flow and do not change any backend integration." },
 ];
 
-export default function NirbhayaFAQ() {
+export default function SafeEraFAQ() {
   const [openItem, setOpenItem] = useState(null);
 
   return (
