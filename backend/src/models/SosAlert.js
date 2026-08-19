@@ -54,6 +54,34 @@ const sosAlertSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  triggerSource: {
+    type: String,
+    enum: ['manual_button', 'threat_detection', 'voice_trigger'],
+    default: 'manual_button'
+  },
+  threatScore: {
+    type: Number,
+    default: 0
+  },
+  threatDetails: {
+    motionScore: { type: Number, default: 0 },
+    audioScore: { type: Number, default: 0 },
+    gpsScore: { type: Number, default: 0 },
+    triggerPhrase: { type: String, default: '' }
+  },
+  icccStatus: {
+    type: String,
+    enum: ['unassigned', 'responding', 'resolved'],
+    default: 'unassigned'
+  },
+  icccOperatorNote: {
+    type: String,
+    default: ''
+  },
+  icccRespondedAt: {
+    type: Date,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now
