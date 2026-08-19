@@ -41,18 +41,18 @@ export default function SignupStep2({ formData, setFormData, errors, onContinue,
             name="emergencyContactRelationship"
             value={formData.emergencyContactRelationship}
             onChange={handleChange}
-            className="premium-select"
+            className="premium-select bg-slate-900 text-white"
           >
-            <option value="">Select relationship</option>
-            <option value="Appa">Appa</option>
-            <option value="Ammi">Ammi</option>
-            <option value="Behen">Behen</option>
-            <option value="Bhai">Bhai</option>
-            <option value="Dost">Dost</option>
-            <option value="Partner">Partner</option>
-            <option value="Spouse">Spouse</option>
-            <option value="Guardian">Guardian</option>
-            <option value="Other">Other</option>
+            <option value="" className="bg-slate-900 text-slate-300">Select relationship</option>
+            <option value="Appa" className="bg-slate-900 text-white">Appa</option>
+            <option value="Ammi" className="bg-slate-900 text-white">Ammi</option>
+            <option value="Behen" className="bg-slate-900 text-white">Behen</option>
+            <option value="Bhai" className="bg-slate-900 text-white">Bhai</option>
+            <option value="Dost" className="bg-slate-900 text-white">Dost</option>
+            <option value="Partner" className="bg-slate-900 text-white">Partner</option>
+            <option value="Spouse" className="bg-slate-900 text-white">Spouse</option>
+            <option value="Guardian" className="bg-slate-900 text-white">Guardian</option>
+            <option value="Other" className="bg-slate-900 text-white">Other</option>
           </select>
         </label>
       </div>

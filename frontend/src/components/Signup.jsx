@@ -102,10 +102,10 @@ export default function Signup() {
         if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
         navigate('/dashboard');
       } else {
-        setErrors({ submit: data.message });
+        setErrors({ submit: data.message || 'Registration failed' });
       }
-    } catch {
-      setErrors({ submit: 'Registration failed. Please check your connection and try again.' });
+    } catch (err) {
+      setErrors({ submit: 'Backend API is offline. Please start the backend server by running "npm start" in the backend directory.' });
     } finally {
       setIsLoading(false);
     }
@@ -128,10 +128,10 @@ export default function Signup() {
         if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
         navigate('/dashboard');
       } else {
-        setErrors({ submit: data.message });
+        setErrors({ submit: data.message || 'Registration failed' });
       }
-    } catch {
-      setErrors({ submit: 'Registration failed. Please check your connection and try again.' });
+    } catch (err) {
+      setErrors({ submit: 'Backend API is offline. Please start the backend server by running "npm start" in the backend directory.' });
     } finally {
       setIsLoading(false);
     }
