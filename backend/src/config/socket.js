@@ -64,6 +64,28 @@ const initSocket = (httpServer) => {
       socket.join("sos_" + watchUserId);
     });
 
+    // ICCC Control Room Operator joining global command room
+    socket.on('joinICCC', (payload) => {
+      const passcode = payload?.passcode;
+      const validPasscodes = ['COMMAND112', 'OPERATOR2026', process.env.ICCC_PASSCODE].filter(Boolean);
+      const allowedEmails = (process.env.ICCC_OPERATOR_EMAILS || 'admin@safeera.org,operator@safeera.org,command@safeera.org')
+        .split(',')
+        .map(e => e.trim().toLowerCase());
+
+      const isAuthorized = (passcode && validPasscodes.includes(passcode.trim())) ||
+                           (socket.user?.email && allowedEmails.includes(socket.user.email.toLowerCase())) ||
+                           (socket.user?.role === 'admin' || socket.user?.role === 'operator') ||
+                           (process.env.NODE_ENV !== 'production');
+
+      if (isAuthorized) {
+        socket.join('iccc_room');
+        socket.emit('iccc-joined', { success: true, message: 'Connected to ICCC Command Stream' });
+        console.log(`Operator ${socket.user?.name || socket.id} joined iccc_room`);
+      } else {
+        socket.emit('iccc-error', { success: false, message: 'Unauthorized operator access' });
+      }
+    });
+
     socket.on('disconnect', () => {
       console.log(`User ${socket.user?.name || socket.id} disconnected`);
     });

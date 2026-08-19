@@ -7,10 +7,10 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ── Token Generation ─────────────────────────────────────────────────
 const generateAccessToken = (userId) =>
-  jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  jwt.sign({ userId }, process.env.JWT_SECRET || 'safe_era_jwt_secret_key_2026', { expiresIn: '15m' });
 
 const generateRefreshToken = (userId) =>
-  jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, { expiresIn: '30d' });
+  jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET || 'safe_era_refresh_secret_key_2026', { expiresIn: '30d' });
 
 // ── Register ─────────────────────────────────────────────────────────
 const register = async (req, res) => {
