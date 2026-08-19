@@ -18,6 +18,7 @@ import GuardianNetwork from '../pages/GuardianNetworkPage';
 import Wellness from '../pages/WellnessPage';
 import News from '../pages/CurrentAffairsPage';
 import Settings from '../pages/SettingsPage';
+import ICCCDashboard from '../pages/ICCCDashboard';
 import NotFound from '../pages/NotFound';
 
 // Global Layout wrapper
@@ -81,6 +82,7 @@ function AppRoutes() {
                 <Route path="/wellness" element={<PrivateRoute><StandardLayout><PageTransition><Wellness /></PageTransition></StandardLayout></PrivateRoute>} />
                 <Route path="/current-affairs" element={<PrivateRoute><StandardLayout><PageTransition><News /></PageTransition></StandardLayout></PrivateRoute>} />
                 <Route path="/settings" element={<PrivateRoute><StandardLayout><PageTransition><Settings /></PageTransition></StandardLayout></PrivateRoute>} />
+                <Route path="/iccc" element={<PrivateRoute><StandardLayout><PageTransition><ICCCDashboard /></PageTransition></StandardLayout></PrivateRoute>} />
 
                 <Route path="*" element={<StandardLayout><PageTransition><NotFound /></PageTransition></StandardLayout>} />
             </Routes>

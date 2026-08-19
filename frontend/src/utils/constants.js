@@ -23,6 +23,7 @@ export const ROUTES = {
     WELLNESS: '/wellness',
     NEWS: '/current-affairs',
     SETTINGS: '/settings',
+    ICCC: '/iccc',
 };
 
 export const APP_NAME = 'Safe-Era';

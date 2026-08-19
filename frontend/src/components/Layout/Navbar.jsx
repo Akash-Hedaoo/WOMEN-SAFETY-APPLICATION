@@ -15,6 +15,7 @@ import {
     LogOut,
     Shield,
     Sparkles,
+    Radio,
 } from 'lucide-react';
 import { ROUTES } from '../../utils/constants';
 import { useAuth } from '../../hooks/useAuth';
@@ -24,6 +25,7 @@ const navLinks = [
     { name: 'Map', path: ROUTES.MAP, icon: MapIcon },
     { name: 'SOS', path: ROUTES.SOS, icon: AlertTriangle },
     { name: 'Guardians', path: ROUTES.GUARDIANS, icon: Users },
+    { name: 'ICCC Command', path: ROUTES.ICCC, icon: Radio },
     { name: 'Wellness', path: ROUTES.WELLNESS, icon: Leaf },
     { name: 'News', path: ROUTES.NEWS, icon: Newspaper },
 ];
