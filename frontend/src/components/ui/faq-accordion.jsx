@@ -20,11 +20,11 @@ export default function SafeEraFAQ() {
       <div className="mx-auto max-w-4xl px-6 md:px-8">
         <div className="mb-12 text-center">
           <div className="premium-chip mx-auto w-fit">
-            <Shield className="h-3.5 w-3.5 text-violet-200" />
+            <Shield className="h-3.5 w-3.5 text-[#7A8E72]" />
             Safety first
           </div>
-          <h2 className="mt-4 font-headline text-3xl font-semibold text-white md:text-5xl">Frequently asked questions</h2>
-          <p className="mx-auto mt-4 max-w-2xl text-slate-300">The redesigned information architecture keeps the important answers easy to scan.</p>
+          <h2 className="mt-4 font-headline text-3xl font-semibold text-[#28302A] md:text-5xl">Frequently asked questions</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-[#687067]">The redesigned information architecture keeps the important answers easy to scan.</p>
         </div>
 
         <div className="space-y-3">
@@ -38,14 +38,14 @@ export default function SafeEraFAQ() {
                   className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left focus-ring"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${open ? 'border-violet-300/40 bg-violet-500/20 text-violet-200' : 'border-white/10 bg-white/6 text-slate-300'}`}>
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${open ? 'border-[#7A8E72] bg-[#FAF0EA] text-[#7A8E72]' : 'border-[#DCDDD5] bg-[#FAF8F5] text-[#687067]'}`}>
                       <Icon className="h-4 w-4" />
                     </div>
-                    <span className="font-semibold text-white">{title}</span>
+                    <span className="font-semibold text-[#28302A]">{title}</span>
                   </div>
                   <div className="relative h-5 w-5">
-                    <Plus className={`absolute inset-0 transition-all ${open ? 'rotate-90 opacity-0' : 'rotate-0 opacity-100'} text-slate-400`} />
-                    <Minus className={`absolute inset-0 transition-all ${open ? 'rotate-0 opacity-100' : '-rotate-90 opacity-0'} text-violet-200`} />
+                    <Plus className={`absolute inset-0 transition-all ${open ? 'rotate-90 opacity-0' : 'rotate-0 opacity-100'} text-[#687067]`} />
+                    <Minus className={`absolute inset-0 transition-all ${open ? 'rotate-0 opacity-100' : '-rotate-90 opacity-0'} text-[#7A8E72]`} />
                   </div>
                 </button>
 
@@ -55,7 +55,7 @@ export default function SafeEraFAQ() {
                   transition={{ duration: 0.28 }}
                   style={{ overflow: 'hidden' }}
                 >
-                  <div className="border-t border-white/10 px-5 py-4 text-sm leading-relaxed text-slate-300">
+                  <div className="border-t border-[#DCDDD5] px-5 py-4 text-sm leading-relaxed text-[#687067]">
                     {content}
                   </div>
                 </motion.div>
@@ -64,8 +64,8 @@ export default function SafeEraFAQ() {
           })}
         </div>
 
-        <p className="mt-8 text-center text-sm text-slate-400">
-          Need more help? <Link to="/support" className="text-violet-200 underline-offset-4 hover:underline">Contact support</Link>
+        <p className="mt-8 text-center text-sm text-[#687067]">
+          Need more help? <Link to="/support" className="text-[#7A8E72] underline-offset-4 hover:underline">Contact support</Link>
         </p>
       </div>
     </section>

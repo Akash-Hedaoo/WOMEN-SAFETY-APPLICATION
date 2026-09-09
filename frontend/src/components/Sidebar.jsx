@@ -13,16 +13,16 @@ export default function Sidebar() {
     const location = useLocation();
 
     return (
-        <aside className="fixed left-0 top-0 z-40 hidden h-screen w-72 border-r border-white/10 bg-slate-950/90 px-5 py-6 backdrop-blur-2xl md:flex">
+        <aside className="fixed left-0 top-0 z-40 hidden h-screen w-72 border-r border-[#DCDDD5] bg-white/95 px-5 py-6 backdrop-blur-2xl md:flex">
             <div className="flex h-full w-full flex-col">
-                <div className="mb-8 rounded-[28px] border border-white/10 bg-white/6 p-5">
+                <div className="mb-8 rounded-[28px] border border-[#DCDDD5] bg-[#FAF8F5] p-5">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 via-purple-500 to-pink-500 shadow-glow">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#7A8E72] shadow-sm">
                             <Users className="h-5 w-5 text-white" />
                         </div>
                         <div>
-                            <h2 className="font-headline text-xl font-semibold text-white">The Guardian</h2>
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">Private safety workspace</p>
+                            <h2 className="font-headline text-xl font-semibold text-[#28302A]">The Guardian</h2>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#687067]">Private safety workspace</p>
                         </div>
                     </div>
                 </div>
@@ -35,20 +35,20 @@ export default function Sidebar() {
                                 key={path}
                                 to={path}
                                 className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-medium transition-all ${
-                                    active ? 'bg-white text-slate-950 shadow-lg shadow-black/20' : 'bg-white/5 text-slate-200 hover:bg-white/10'
+                                    active ? 'bg-[#A8B8A0]/30 text-[#28302A] border border-[#A8B8A0]/50 font-semibold shadow-sm' : 'text-[#687067] hover:bg-[#FAF8F5] hover:text-[#28302A]'
                                 }`}
                             >
-                                <Icon className={`h-4 w-4 ${active ? 'text-violet-600' : 'text-violet-300'}`} />
+                                <Icon className={`h-4 w-4 ${active ? 'text-[#7A8E72]' : 'text-[#A8B8A0]'}`} />
                                 {label}
                             </Link>
                         );
                     })}
                 </nav>
 
-                <div className="mt-auto rounded-[28px] border border-violet-400/20 bg-gradient-to-br from-violet-500/20 via-purple-500/15 to-pink-500/20 p-5">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-violet-200">Premium guardian plan</p>
-                    <h3 className="mt-2 font-headline text-xl font-semibold text-white">Upgrade to Pro</h3>
-                    <p className="mt-2 text-sm text-slate-300">Unlimited guardians, offline maps, and priority routing.</p>
+                <div className="mt-auto rounded-[28px] border border-[#DCDDD5] bg-[#FAF0EA] p-5">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[#7A8E72]">Premium guardian plan</p>
+                    <h3 className="mt-2 font-headline text-xl font-semibold text-[#28302A]">Upgrade to Pro</h3>
+                    <p className="mt-2 text-sm text-[#687067]">Unlimited guardians, offline maps, and priority routing.</p>
                     <Link to="/pricing" className="btn-primary mt-4 w-full justify-center">
                         Explore plans
                     </Link>

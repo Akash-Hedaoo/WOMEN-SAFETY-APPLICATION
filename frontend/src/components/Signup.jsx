@@ -138,23 +138,22 @@ export default function Signup() {
   };
 
   return (
-    <div className="page-shell min-h-screen overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(139,92,246,.22),_transparent_25%),radial-gradient(circle_at_bottom_right,_rgba(236,72,153,.18),_transparent_20%)]" />
+    <div className="page-shell min-h-screen overflow-hidden bg-[#FAF0EA]">
       <div className="relative grid min-h-screen lg:grid-cols-12">
-        <aside className="relative hidden overflow-hidden border-r border-white/10 lg:col-span-5 lg:block">
+        <aside className="relative hidden overflow-hidden border-r border-[#DCDDD5] lg:col-span-5 lg:block">
           <div className="absolute inset-0 bg-[url('/auth-illustration.png')] bg-cover bg-center" />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/55 to-violet-950/80" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#FAF0EA]/95 via-[#FAF8F5]/90 to-[#FAF0EA]/95" />
           <div className="relative flex h-full flex-col justify-between p-12">
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/8 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-200">
-              <Sparkles className="h-3.5 w-3.5 text-violet-200" />
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#DCDDD5] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#28302A] shadow-sm">
+              <Sparkles className="h-3.5 w-3.5 text-[#7A8E72]" />
               Premium onboarding
             </div>
             <div className="max-w-xl space-y-6">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Join the network</p>
-              <h1 className="font-headline text-5xl font-semibold leading-tight text-white">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#7A8E72]">Join the network</p>
+              <h1 className="font-headline text-5xl font-semibold leading-tight text-[#28302A]">
                 Start with clarity, not clutter.
               </h1>
-              <p className="max-w-lg text-lg leading-relaxed text-slate-300">
+              <p className="max-w-lg text-lg leading-relaxed text-[#687067]">
                 The signup experience now feels like a premium SaaS flow with stronger structure, softer surfaces, and better rhythm.
               </p>
               <div className="space-y-3">
@@ -168,14 +167,14 @@ export default function Signup() {
               </div>
             </div>
             <div className="premium-panel-strong max-w-md p-6">
-              <p className="text-sm leading-relaxed text-slate-200">
+              <p className="text-sm leading-relaxed text-[#28302A]">
                 “The flow now communicates trust before asking for any sensitive detail.”
               </p>
               <div className="mt-4 flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-500 to-pink-500" />
+                <div className="h-10 w-10 rounded-full bg-[#7A8E72]" />
                 <div>
-                  <p className="text-sm font-semibold text-white">Design review note</p>
-                  <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">System redesign</p>
+                  <p className="text-sm font-semibold text-[#28302A]">Design review note</p>
+                  <p className="text-[10px] uppercase tracking-[0.22em] text-[#687067]">System redesign</p>
                 </div>
               </div>
             </div>
@@ -186,12 +185,12 @@ export default function Signup() {
           <div className="w-full max-w-3xl">
             <div className="mb-8 lg:hidden">
               <div className="inline-flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 via-purple-500 to-pink-500 shadow-glow">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#7A8E72] shadow-sm">
                   <Shield className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-headline text-xl font-semibold text-white">Safe-Era</p>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">Create your account</p>
+                  <p className="font-headline text-xl font-semibold text-[#28302A]">Safe-Era</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#687067]">Create your account</p>
                 </div>
               </div>
             </div>
@@ -199,7 +198,7 @@ export default function Signup() {
             <ProgressBar currentStep={currentStep} />
 
             {errors.submit && (
-              <div className="mb-6 rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+              <div className="mb-6 rounded-2xl border border-[#C62828]/30 bg-[#C62828]/10 px-4 py-3 text-sm text-[#C62828]">
                 {errors.submit}
               </div>
             )}
