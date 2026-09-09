@@ -7,24 +7,24 @@
 
 ---
 
-## 📋 Coverage Matrix
+## 📋 Coverage Matrix (with AI Check & Human Check)
 
-| Feature (Problem Statement) | Checked | Status | Our Implementation |
-| :--- | :---: | :---: | :--- |
-| **One-touch SOS button** | [x] | ✅ Done | Instant 1-tap emergency alert, WebSocket broadcast, and Twilio SMS dispatch. |
-| **Live GPS location** | [x] | ✅ Done | Real-time latitude/longitude sharing with OpenStreetMap/Leaflet integration. |
-| **Share location with family** | [x] | ✅ Done | Automated SMS alerts with Google Maps link + live alphanumeric share codes. |
-| **Nearby police station** | [x] | ✅ Done | Nearest police station identification via MongoDB 2dsphere geospatial queries. |
-| **Nearby hospital** | [x] | ✅ Done | Nearest hospital identification with distance and contact phone info. |
-| **Incident logging** | [x] | ✅ Done | Full structured MongoDB records with multi-signal scores, operator notes & timestamps. |
-| **ICCC analytics dashboard** | [x] | ✅ Done | Operator-gated control room (`/iccc`) with live incident stream, map pins, and dispatch buttons. |
-| **Route tracking until help arrives** | [ ] | 🟡 Partial | Live location sharing & ETA active; continuous turn-by-turn rescue vehicle tracking can be improved. |
-| **Voice-triggered SOS** | [ ] | 🟡 Partial | Working browser Web Speech API with 9 trigger phrases & 3s cancel countdown (`VoiceSOSListener.jsx`). |
-| **AI threat detection (voice distress)** | [ ] | 🟡 Partial | Real-time Web Audio API decibel analyzer and distress spike detection (`AIThreatMonitor.jsx`). |
-| **AI threat detection (abnormal movement)** | [ ] | 🟡 Partial | Accelerometer `DeviceMotionEvent` spike detection & multi-signal threat scoring (`AIThreatMonitor.jsx`). |
-| **ICCC integration** | [ ] | 🟡 Partial | Internal Socket.IO `iccc_room` & REST API live; external government ERSS-112 gateway simulation. |
-| **Geofencing for unsafe zones** | [ ] | ❌ Not Done | High-risk area polygon boundary alerts not implemented yet (Planned for next phase). |
-| **IoT wearable trigger** | [ ] | ❌ Not Done | Smartwatch/BLE band hardware emergency trigger not integrated yet (Planned for next phase). |
+| Feature (Problem Statement) | AI Check | Human Check | Status | Our Implementation |
+| :--- | :---: | :---: | :---: | :--- |
+| **One-touch SOS button** | [x] | [x] | ✅ Done | Instant emergency alert with one tap (Added: WebSocket live broadcast & Twilio SMS auto-dispatch) |
+| **Live GPS location** | [x] | [x] | ✅ Done | Real-time latitude/longitude sharing (Added: Leaflet/OpenStreetMap mapping integration) |
+| **Share location with family** | [x] | [x] | ✅ Done | Auto notification to emergency contacts (Added: Twilio SMS with Google Maps link & live alphanumeric share codes) |
+| **Nearby police station** | [x] | [x] | ✅ Done | Nearest police station identification (Added: MongoDB 2dsphere geospatial distance query) |
+| **Nearby hospital** | [x] | [x] | ✅ Done | Nearest hospital identification (Added: Distance calculation and direct call support) |
+| **Route tracking until help arrives** | [x] | [x] | 🟡 Partial | Live location available; continuous rescue tracking can be improved (Added: Share session ETA countdown active; rescuer vehicle live route polyline in progress) |
+| **Voice-triggered SOS** | [x] | [x] | 🟡 Partial *(Changed from ❌ Not Done)* | (Old: "No hands-free emergency activation yet" ➔ New: Implemented in `VoiceSOSListener.jsx` using Web Speech API with 9 trigger phrases & 3-sec safety cancel countdown. Native background service for locked phone in progress.) |
+| **AI threat detection (voice distress)** | [x] | [x] | 🟡 Partial *(Changed from ❌ Not Done)* | (Old: "Distress speech/emotion detection not implemented" ➔ New: Implemented in `AIThreatMonitor.jsx` using Web Audio API real-time decibel analyser and scream spike detection. ML neural classifier in roadmap.) |
+| **AI threat detection (abnormal movement)** | [x] | [x] | 🟡 Partial *(Changed from ❌ Not Done)* | (Old: "Fall/running/panic movement detection missing" ➔ New: Implemented in `AIThreatMonitor.jsx` via `DeviceMotionEvent` acceleration jolt thresholding & multi-signal threat scoring. Embedded ML in roadmap.) |
+| **ICCC integration** | [x] | [x] | 🟡 Partial *(Changed from ❌ Not Done)* | (Old: "Alerts are not sent directly to ICCC systems" ➔ New: Internal Socket.IO `iccc_room` live alert broadcast & REST endpoints `/api/sos/iccc/*` are functional. Official Govt ERSS-112 gateway pending.) |
+| **Incident logging** | [x] | [x] | ✅ Done *(Changed from 🟡 Partial)* | (Old: "Basic SOS history possible; structured incident records needed" ➔ New: Fully structured MongoDB `SosAlert` schema storing GPS coordinates, AI threat signal breakdown, operator notes, SMS counts & resolution timestamps.) |
+| **ICCC analytics dashboard** | [x] | [x] | ✅ Done *(Changed from ❌ Not Done)* | (Old: "No dashboard for authorities/command center" ➔ New: Fully built authority portal in `ICCCDashboard.jsx` at `/iccc` with operator passcodes, live incident stream, map pins & 1-tap dispatch actions.) |
+| **Geofencing for unsafe zones** | [x] | [x] | ❌ Not Done | (Status Unchanged: High-risk red-zone polygon boundary enter/exit alerts not implemented yet. Scheduled for Next Sprint.) |
+| **IoT wearable trigger** | [x] | [x] | ❌ Not Done | (Status Unchanged: Smartwatch/BLE band hardware emergency trigger not integrated yet. Scheduled for Next Sprint.) |
 
 ---
 
