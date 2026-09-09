@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 
@@ -59,9 +59,9 @@ const PrivateRoute = ({ children }) => {
 
 export default function AppRouter() {
     return (
-        <BrowserRouter>
+        <HashRouter>
             <AppRoutes />
-        </BrowserRouter>
+        </HashRouter>
     );
 }
 

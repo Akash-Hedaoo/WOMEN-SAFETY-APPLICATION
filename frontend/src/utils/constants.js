@@ -27,7 +27,7 @@ export const ROUTES = {
 };
 
 export const APP_NAME = 'Safe-Era';
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://10.0.2.2:5001';
 
 export const MOCK_USER = {
     name: 'Anushka Prasad',

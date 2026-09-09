@@ -7,9 +7,18 @@
     "dev": "vite --host",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "cap:sync": "npx cap sync",
+    "cap:open": "npx cap open android",
+    "cap:build": "vite build && npx cap sync"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/geolocation": "^8.2.2",
+    "@capacitor/network": "^8.0.1",
+    "@capawesome/capacitor-sms-composer": "^0.1.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-icons": "^1.3.2",
     "@react-oauth/google": "^0.13.5",

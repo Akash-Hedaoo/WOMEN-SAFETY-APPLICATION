@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Clock, ShieldAlert, Users, Phone, Activity, Volume2, Radio, AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react';
+import { CheckCircle2, Clock, ShieldAlert, Users, Phone, Activity, Volume2, Radio, AlertTriangle, ArrowRight, RefreshCw, Wifi, WifiOff, MessageSquare, Save } from 'lucide-react';
 import io from 'socket.io-client';
 import AIThreatMonitor from '../components/Safety/AIThreatMonitor';
 import VoiceSOSListener from '../components/Safety/VoiceSOSListener';
 import { API_BASE_URL, ROUTES } from '../utils/constants';
+import { triggerSOS as triggerSOSService, startAutoSync } from '../services/sosService';
+import { syncGuardians } from '../services/guardianCacheService';
 
 const getAuthToken = () => {
   return localStorage.getItem('authToken') || localStorage.getItem('token') || localStorage.getItem('accessToken');
@@ -31,6 +33,9 @@ export default function SOSPage() {
   const [isLoadingGuardians, setIsLoadingGuardians] = useState(true);
   const [logs, setLogs] = useState([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
+  const [sosSteps, setSosSteps] = useState([]);
+  const [sosMode, setSosMode] = useState(null); // 'online'|'offline_sms'|'queued_only'
+  const [sosOtp, setSosOtp] = useState(null);
   const socketRef = useRef(null);
 
   const currentUser = getStoredUser();
@@ -86,8 +91,8 @@ export default function SOSPage() {
             const sourceLabel = a.triggerSource === 'threat_detection'
               ? 'AI Threat Trigger'
               : a.triggerSource === 'voice_trigger'
-              ? 'Voice Phrase SOS'
-              : 'Manual SOS Button';
+                ? 'Voice Phrase SOS'
+                : 'Manual SOS Button';
 
             return {
               id: a._id,
@@ -138,8 +143,14 @@ export default function SOSPage() {
     fetchSosHistory();
     checkActiveSos();
 
+    // Sync guardian cache for offline SOS
+    syncGuardians().catch(() => {});
+
+    // Start auto-sync for pending offline SOS records
+    const cleanupAutoSync = startAutoSync();
+
     const token = getAuthToken();
-    if (!token) return;
+    if (!token) return cleanupAutoSync;
 
     const socket = io(API_BASE_URL || window.location.origin, {
       transports: ['websocket', 'polling']
@@ -170,6 +181,7 @@ export default function SOSPage() {
 
     return () => {
       socket.disconnect();
+      cleanupAutoSync();
     };
   }, [fetchGuardians, fetchSosHistory, checkActiveSos, currentUser?._id]);
 
@@ -202,7 +214,7 @@ export default function SOSPage() {
     return () => clearInterval(timer);
   }, [stage]);
 
-  // Trigger Real SOS API Call
+  // Trigger SOS — uses sosService for online/offline/no-signal flow
   const triggerSosApi = async (payload) => {
     try {
       const token = getAuthToken();
@@ -211,49 +223,39 @@ export default function SOSPage() {
         return;
       }
 
-      let latitude = 18.5204;
-      let longitude = 73.8567;
-
-      if ('geolocation' in navigator) {
-        try {
-          const pos = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 4000 });
-          });
-          latitude = pos.coords.latitude;
-          longitude = pos.coords.longitude;
-        } catch (e) {
-          // fallback to network IP
-        }
-      }
-
-      const res = await fetch(`${API_BASE_URL}/api/sos/trigger`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          latitude,
-          longitude,
-          triggerSource: payload?.triggerSource || 'manual_button',
-          threatScore: payload?.threatScore || (payload?.triggerSource === 'threat_detection' ? 88 : 0),
-          threatDetails: payload?.threatDetails || {},
-          message: payload?.message || 'Emergency assistance needed immediately!'
-        })
+      const result = await triggerSOSService({
+        triggerSource: payload?.triggerSource || 'manual_button',
+        threatScore: payload?.threatScore || (payload?.triggerSource === 'threat_detection' ? 88 : 0),
+        threatDetails: payload?.threatDetails || {},
+        message: payload?.message || 'Emergency assistance needed immediately!',
       });
 
-      const data = await res.json();
-      if (data.success) {
+      setSosSteps(result.steps || []);
+      setSosMode(result.mode);
+      setSosOtp(result.otp);
+
+      if (result.success) {
         setStage('active');
-        setActiveAlertDetails(data.alert || data);
-        showToast(`🚨 SOS Dispatched! Alerted ${data.guardiansAlerted || guardiansList.length} guardians & ICCC.`);
+        if (result.alert) {
+          setActiveAlertDetails(result.alert);
+        }
+
+        if (result.mode === 'online') {
+          showToast(`🚨 SOS Dispatched! Guardians alerted via server.`);
+        } else if (result.mode === 'offline_sms') {
+          showToast(result.smsResult?.sent > 0
+            ? `🚨 Emergency SMS sent from this phone to ${result.smsResult.sent} guardian(s).`
+            : '🚨 Emergency SMS composer opened. Backend sync pending.');
+        } else {
+          showToast(`🚨 SOS saved locally. Will send when signal returns.`);
+        }
         fetchSosHistory();
       } else {
-        showToast(data.message || 'Failed to dispatch SOS alert.');
+        showToast('Failed to dispatch SOS alert.');
       }
     } catch (err) {
       console.error('SOS Trigger Error:', err);
-      showToast('Error communicating with SOS server.');
+      showToast('Error dispatching SOS alert.');
     }
   };
 
@@ -335,19 +337,20 @@ export default function SOSPage() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-7">
         {/* Status Indicator Banner */}
         <div
-          className={`rounded-[28px] border px-6 py-4 text-center text-xs font-bold uppercase tracking-[0.24em] transition-all flex items-center justify-center gap-2.5 ${
-            stage === 'active'
+          className={`rounded-[28px] border px-6 py-4 text-center text-xs font-bold uppercase tracking-[0.24em] transition-all flex items-center justify-center gap-2.5 ${stage === 'active'
               ? 'border-[#C62828]/40 bg-[#C62828]/15 text-[#C62828] shadow-[0_0_24px_rgba(198,40,40,0.2)] animate-pulse'
               : stage === 'confirming'
-              ? 'border-[#C18A32]/40 bg-[#C18A32]/15 text-[#C18A32]'
-              : stage === 'safe'
-              ? 'border-[#4F7D55]/40 bg-[#4F7D55]/15 text-[#4F7D55]'
-              : 'border-[#DCDDD5] bg-white text-[#687067] shadow-sm'
-          }`}
+                ? 'border-[#C18A32]/40 bg-[#C18A32]/15 text-[#C18A32]'
+                : stage === 'safe'
+                  ? 'border-[#4F7D55]/40 bg-[#4F7D55]/15 text-[#4F7D55]'
+                  : 'border-[#DCDDD5] bg-white text-[#687067] shadow-sm'
+            }`}
         >
           {stage === 'idle' && '🟢 Safe-Era Active · All Safety Channels Standing By'}
           {stage === 'confirming' && '⚠️ Preparing SOS Broadcast · Tap button again to abort'}
-          {stage === 'active' && '🚨 Live SOS Active · Guardians Alerted via Socket & SMS'}
+          {stage === 'active' && (sosMode === 'offline_sms'
+            ? '🚨 Live SOS Active · Emergency SMS sent from this phone'
+            : '🚨 Live SOS Active · Guardians Alerted via Socket & SMS')}
           {stage === 'cancelled' && '⚪ SOS Alert Cancelled · All parties notified'}
           {stage === 'safe' && '✅ Marked Safe · Emergency Incident Resolved'}
         </div>
@@ -356,33 +359,30 @@ export default function SOSPage() {
         <div className="flex items-center justify-center gap-2 border-b border-[#DCDDD5] pb-4">
           <button
             onClick={() => setActiveTab('MANUAL')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
-              activeTab === 'MANUAL'
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'MANUAL'
                 ? 'bg-[#C62828] text-white shadow-md shadow-[#C62828]/25'
                 : 'bg-white text-[#687067] border border-[#DCDDD5] hover:bg-[#FAF0EA] hover:text-[#28302A]'
-            }`}
+              }`}
           >
             <ShieldAlert className="h-4 w-4" /> Manual SOS Button
           </button>
 
           <button
             onClick={() => setActiveTab('THREAT_AI')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
-              activeTab === 'THREAT_AI'
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'THREAT_AI'
                 ? 'bg-[#7A8E72] text-white shadow-md shadow-[#7A8E72]/25'
                 : 'bg-white text-[#687067] border border-[#DCDDD5] hover:bg-[#FAF0EA] hover:text-[#28302A]'
-            }`}
+              }`}
           >
             <Activity className="h-4 w-4" /> AI Threat Detection
           </button>
 
           <button
             onClick={() => setActiveTab('VOICE')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
-              activeTab === 'VOICE'
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'VOICE'
                 ? 'bg-[#7A8E72] text-white shadow-md shadow-[#7A8E72]/25'
                 : 'bg-white text-[#687067] border border-[#DCDDD5] hover:bg-[#FAF0EA] hover:text-[#28302A]'
-            }`}
+              }`}
           >
             <Volume2 className="h-4 w-4" /> Voice-Triggered SOS
           </button>
@@ -403,13 +403,11 @@ export default function SOSPage() {
                     <button
                       onClick={handleSOSClick}
                       disabled={stage === 'active'}
-                      className={`relative flex h-64 w-64 items-center justify-center rounded-full border shadow-2xl transition-all duration-300 ${
-                        stage === 'idle' || stage === 'cancelled' || stage === 'safe'
+                      className={`relative flex h-64 w-64 items-center justify-center rounded-full border shadow-2xl transition-all duration-300 ${stage === 'idle' || stage === 'cancelled' || stage === 'safe'
                           ? 'border-[#C62828]/60 bg-[#C62828] hover:bg-[#b02222] hover:scale-105 active:scale-95 shadow-[0_12px_32px_rgba(198,40,40,0.35)]'
                           : ''
-                      } ${stage === 'confirming' ? 'border-[#C18A32]/60 bg-[#C18A32] scale-105 animate-bounce' : ''} ${
-                        stage === 'active' ? 'border-[#C62828]/60 bg-[#9B1C1C] shadow-[0_12px_32px_rgba(198,40,40,0.45)]' : ''
-                      }`}
+                        } ${stage === 'confirming' ? 'border-[#C18A32]/60 bg-[#C18A32] scale-105 animate-bounce' : ''} ${stage === 'active' ? 'border-[#C62828]/60 bg-[#9B1C1C] shadow-[0_12px_32px_rgba(198,40,40,0.45)]' : ''
+                        }`}
                     >
                       {(stage === 'idle' || stage === 'cancelled' || stage === 'safe') && (
                         <div className="space-y-2 text-white">
@@ -476,6 +474,44 @@ export default function SOSPage() {
                       </>
                     )}
                   </div>
+
+                  {/* SOS Delivery Status Detail */}
+                  {sosSteps.length > 0 && stage === 'active' && (
+                    <div className="mt-6 w-full max-w-md mx-auto">
+                      <div className="rounded-2xl border border-[#DCDDD5] bg-[#FAF8F5] p-4 space-y-2.5">
+                        <div className="flex items-center gap-2 mb-3">
+                          {sosMode === 'online' && <Wifi className="h-4 w-4 text-[#4F7D55]" />}
+                          {sosMode === 'offline_sms' && <MessageSquare className="h-4 w-4 text-[#C18A32]" />}
+                          {sosMode === 'queued_only' && <Save className="h-4 w-4 text-[#C62828]" />}
+                          <span className="text-xs font-bold uppercase tracking-wider text-[#28302A]">
+                            {sosMode === 'online' && 'Online Dispatch'}
+                            {sosMode === 'offline_sms' && 'Offline SMS Mode'}
+                            {sosMode === 'queued_only' && 'Queued Locally'}
+                          </span>
+                        </div>
+                        {sosSteps.map((s, i) => (
+                          <div key={i} className="flex items-start gap-2.5 text-xs">
+                            <span className="mt-0.5 shrink-0">
+                              {s.status === 'success' && <CheckCircle2 className="h-3.5 w-3.5 text-[#4F7D55]" />}
+                              {s.status === 'warning' && <AlertTriangle className="h-3.5 w-3.5 text-[#C18A32]" />}
+                              {s.status === 'pending' && <Clock className="h-3.5 w-3.5 text-[#7A8E72] animate-pulse" />}
+                              {s.status === 'failed' && <AlertTriangle className="h-3.5 w-3.5 text-[#C62828]" />}
+                            </span>
+                            <div>
+                              <span className="font-semibold text-[#28302A]">{s.step}: </span>
+                              <span className="text-[#687067]">{s.detail}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {sosOtp && (
+                          <div className="mt-2 pt-2 border-t border-[#DCDDD5] text-center">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#687067]">Emergency OTP</span>
+                            <div className="text-2xl font-mono font-bold text-[#C62828] tracking-[0.3em]">{sosOtp}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
             )}
@@ -543,9 +579,8 @@ export default function SOSPage() {
                           </p>
                         </div>
                       </div>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                        g.isVerified ? 'bg-[#4F7D55]/15 text-[#4F7D55] border border-[#4F7D55]/30' : 'bg-[#C18A32]/15 text-[#C18A32]'
-                      }`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${g.isVerified ? 'bg-[#4F7D55]/15 text-[#4F7D55] border border-[#4F7D55]/30' : 'bg-[#C18A32]/15 text-[#C18A32]'
+                        }`}>
                         {g.isVerified ? 'Linked ✓' : 'Pending OTP'}
                       </span>
                     </div>

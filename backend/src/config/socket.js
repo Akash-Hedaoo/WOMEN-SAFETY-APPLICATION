@@ -1,6 +1,7 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { accessTokenSecret } = require('./authTokens');
 
 let io = null;
 
@@ -43,7 +44,7 @@ const initSocket = (httpServer) => {
     const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
     if (!token) return next(new Error('Authentication required'));
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, accessTokenSecret);
       const user = await User.findById(decoded.userId).select('name phone');
       if (!user) return next(new Error('User not found'));
       socket.userId = decoded.userId;

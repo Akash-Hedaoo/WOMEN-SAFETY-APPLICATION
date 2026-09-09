@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // Native platform output contains generated third-party bundles and must not
+  // be linted as application source.
+  globalIgnores(['dist', 'android']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

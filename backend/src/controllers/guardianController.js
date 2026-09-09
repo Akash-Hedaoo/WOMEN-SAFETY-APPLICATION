@@ -1,23 +1,32 @@
 const Guardian = require('../models/Guardian');
 const twilio = require('twilio');
 
-const twilioClient = process.env.TWILIO_ACCOUNT_SID
-  ? require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER
+  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
   : null;
+
+const toE164IndianNumber = (phoneNumber) => {
+  const digits = String(phoneNumber || '').replace(/\D/g, '');
+  if (digits.length === 10) return `+91${digits}`;
+  if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
+  return phoneNumber;
+};
 
 const sendSMS = async (to, body) => {
   if (!twilioClient) {
-    console.log('[MOCK SMS to', to, ']:', body);
-    return;
+    console.error('[SMS] Twilio is not configured; message was not sent.');
+    return { success: false, error: 'SMS provider is not configured' };
   }
   try {
     await twilioClient.messages.create({
       body,
       from: process.env.TWILIO_PHONE_NUMBER,
-      to: '+91' + to
+      to: toE164IndianNumber(to)
     });
+    return { success: true };
   } catch (e) {
     console.error('SMS error:', e.message);
+    return { success: false, error: e.message };
   }
 };
 
@@ -90,13 +99,16 @@ const addGuardian = async (req, res) => {
 
     const smsBody = `Hi ${guardianName}! ${req.user.name} has added you as a safety guardian on Safe-Era. Your verification code is: ${otp}. Reply with this code to ${req.user.name} to confirm. Valid for 15 minutes.`;
 
-    await sendSMS(guardianPhone, smsBody);
+    const smsResult = await sendSMS(guardianPhone, smsBody);
 
     return res.status(201).json({
       success: true,
-      message: "Guardian added. OTP sent to their number for verification.",
+      message: smsResult.success
+        ? "Guardian added. OTP sent to their number for verification."
+        : "Guardian added, but the verification SMS could not be sent.",
       guardian,
-      otpSent: true
+      otpSent: smsResult.success,
+      smsError: smsResult.success ? undefined : smsResult.error
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -144,9 +156,16 @@ const verifyGuardian = async (req, res) => {
     await guardian.save();
 
     const smsBody = `You are now a verified safety guardian for ${req.user.name} on Safe-Era. You will receive emergency alerts if ${req.user.name} triggers SOS.`;
-    await sendSMS(guardian.guardianPhone, smsBody);
+    const smsResult = await sendSMS(guardian.guardianPhone, smsBody);
 
-    return res.status(200).json({ success: true, message: "Guardian verified successfully", guardian });
+    return res.status(200).json({
+      success: true,
+      message: smsResult.success
+        ? "Guardian verified successfully"
+        : "Guardian verified, but the confirmation SMS could not be sent.",
+      guardian,
+      smsSent: smsResult.success
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -183,9 +202,13 @@ const resendOTP = async (req, res) => {
     await guardian.save();
 
     const smsBody = `Hi ${guardian.guardianName}! ${req.user.name} has added you as a safety guardian on Safe-Era. Your new verification code is: ${otp}. Reply with this code to ${req.user.name} to confirm. Valid for 15 minutes.`;
-    await sendSMS(guardian.guardianPhone, smsBody);
+    const smsResult = await sendSMS(guardian.guardianPhone, smsBody);
 
-    return res.status(200).json({ success: true, message: "New OTP sent to guardian's phone" });
+    return res.status(200).json({
+      success: smsResult.success,
+      message: smsResult.success ? "New OTP sent to guardian's phone" : "Could not send the new OTP.",
+      smsError: smsResult.success ? undefined : smsResult.error
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -236,7 +259,11 @@ const sendTestAlert = async (req, res) => {
     }
 
     const smsBody = `TEST ALERT from Safe-Era\n\nThis is a test from ${req.user.name}. If you receive this, you are set up to receive real emergency alerts.\n\nNo action needed.`;
-    await sendSMS(guardian.guardianPhone, smsBody);
+    const smsResult = await sendSMS(guardian.guardianPhone, smsBody);
+
+    if (!smsResult.success) {
+      return res.status(502).json({ success: false, message: "Test alert could not be sent.", smsError: smsResult.error });
+    }
 
     guardian.lastAlertedAt = new Date();
     await guardian.save();

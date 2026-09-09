@@ -2,15 +2,16 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
+const { accessTokenSecret, refreshTokenSecret } = require('../config/authTokens');
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ── Token Generation ─────────────────────────────────────────────────
 const generateAccessToken = (userId) =>
-  jwt.sign({ userId }, process.env.JWT_SECRET || 'safe_era_jwt_secret_key_2026', { expiresIn: '15m' });
+  jwt.sign({ userId }, accessTokenSecret, { expiresIn: '15m' });
 
 const generateRefreshToken = (userId) =>
-  jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET || 'safe_era_refresh_secret_key_2026', { expiresIn: '30d' });
+  jwt.sign({ userId }, refreshTokenSecret, { expiresIn: '30d' });
 
 // ── Register ─────────────────────────────────────────────────────────
 const register = async (req, res) => {
@@ -306,7 +307,7 @@ const refreshAccessToken = async (req, res) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+      decoded = jwt.verify(refreshToken, refreshTokenSecret);
     } catch (err) {
       return res.status(401).json({ success: false, message: 'Invalid or expired refresh token' });
     }

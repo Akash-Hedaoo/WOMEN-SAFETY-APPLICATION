@@ -4,10 +4,22 @@ import {
   Plus, RefreshCw, Send, Shield, ShieldCheck, Trash2, UserPlus, X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
+import { syncGuardians } from '../services/guardianCacheService';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const getToken = () => localStorage.getItem('authToken');
+const getToken = () => (
+  localStorage.getItem('authToken')
+  || localStorage.getItem('token')
+  || localStorage.getItem('accessToken')
+);
+
+const normalizeIndianMobile = (value) => {
+  const digits = value.replace(/\D/g, '');
+  // Treat +91/91 as a country code only when all 12 digits were supplied.
+  // A valid Indian mobile number can itself begin with 91.
+  return digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits;
+};
 
 const apiFetch = async (path, options = {}) => {
   const token = getToken();
@@ -19,7 +31,7 @@ const apiFetch = async (path, options = {}) => {
       ...(options.headers || {}),
     },
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || 'Request failed');
   return data;
 };
@@ -376,7 +388,7 @@ export default function GuardianNetworkPage() {
     if (!formData.guardianName || !formData.guardianPhone) return;
 
     // Validate 10-digit Indian phone
-    const phoneClean = formData.guardianPhone.replace(/\D/g, '').replace(/^91/, '');
+    const phoneClean = normalizeIndianMobile(formData.guardianPhone);
     if (!/^[6-9]\d{9}$/.test(phoneClean)) {
       showToast({ type: 'error', message: 'Please enter a valid 10-digit Indian mobile number' });
       return;
@@ -390,7 +402,7 @@ export default function GuardianNetworkPage() {
       });
       showToast({ message: data.message || 'Guardian added! OTP sent to their number.' });
       setFormData({ guardianName: '', guardianPhone: '', relation: 'Friend' });
-      fetchGuardians();
+      await Promise.all([fetchGuardians(), syncGuardians()]);
     } catch (err) {
       showToast({ type: 'error', message: err.message });
     } finally {
@@ -471,12 +483,12 @@ export default function GuardianNetworkPage() {
                 />
               </div>
               <div>
-                <label className="text-xs text-[#687067] mb-1 block">Phone number (10 digits, no country code)</label>
+                <label className="text-xs text-[#687067] mb-1 block">Phone number (10 digits; +91 is optional)</label>
                 <input
                   className="premium-input"
-                  placeholder="9876543210"
+                  placeholder="9876543210 or 919876543210"
                   value={formData.guardianPhone}
-                  maxLength={10}
+                  maxLength={12}
                   onChange={(e) => setFormData({ ...formData, guardianPhone: e.target.value.replace(/\D/g, '') })}
                   required
                 />

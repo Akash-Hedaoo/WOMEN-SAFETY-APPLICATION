@@ -8,11 +8,11 @@ const sosAlertSchema = new mongoose.Schema({
   },
   latitude: {
     type: Number,
-    required: true
+    required: function () { return this.locationType !== 'unavailable'; }
   },
   longitude: {
     type: Number,
-    required: true
+    required: function () { return this.locationType !== 'unavailable'; }
   },
   message: {
     type: String,
@@ -81,6 +81,30 @@ const sosAlertSchema = new mongoose.Schema({
   icccRespondedAt: {
     type: Date,
     default: null
+  },
+  // --- Capacitor / Offline SOS fields (all optional, backward-compatible) ---
+  clientSosId: {
+    type: String,
+    default: null
+  },
+  otp: {
+    type: String,
+    default: null
+  },
+  locationType: {
+    type: String,
+    enum: ['current', 'last_known', 'unavailable'],
+    default: 'current'
+  },
+  deliveryMethod: {
+    type: String,
+    enum: ['online', 'offline_sms', 'pending'],
+    default: 'online'
+  },
+  deliveryStatus: {
+    type: String,
+    enum: ['sent', 'pending', 'failed'],
+    default: 'sent'
   },
   createdAt: {
     type: Date,

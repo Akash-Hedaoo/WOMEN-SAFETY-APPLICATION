@@ -3,23 +3,46 @@ const Guardian = require('../models/Guardian');
 const { getIO } = require('../config/socket');
 const twilio = require('twilio');
 
-const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
+const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER
   ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
   : null;
 
+const toE164IndianNumber = (phoneNumber) => {
+  const digits = String(phoneNumber || '').replace(/\D/g, '');
+  if (digits.length === 10) return `+91${digits}`;
+  if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
+  return phoneNumber;
+};
+
 const sendSMSToGuardian = async (guardian, alertData) => {
-  const smsBody = `EMERGENCY ALERT from Safe-Era\n\n${alertData.userName} needs immediate help!\n\nLocation: ${alertData.googleMapsLink}\n\nCall them: ${alertData.userPhone}\n\nThis alert was sent automatically by Safe-Era safety app.`;
-  
+  const hasCoordinates = Number.isFinite(alertData.latitude) && Number.isFinite(alertData.longitude);
+  const isOffline = alertData.smsStatus === 'offline';
+  const locationLabel = isOffline ? '📍 Last known location' : '📍 Location';
+  const location = hasCoordinates ? alertData.googleMapsLink : 'Location unavailable';
+  const statusLine = isOffline
+    ? '⚠️ Her device is currently offline. This alert was sent directly via SMS.'
+    : '📡 Status: Online';
+  const details = isOffline
+    ? [statusLine, `${locationLabel}: ${location}`, `🔐 Verification OTP: ${alertData.otp || 'N/A'}`]
+    : [`${locationLabel}: ${location}`, `🔐 Verification OTP: ${alertData.otp || 'N/A'}`, statusLine];
+  const formattedSmsBody = [
+    '🚨 SAFE-ERA SOS ALERT 🚨',
+    '',
+    'Your member may be in danger and has triggered an SOS.',
+    ...details,
+    'Please contact her immediately and take necessary action.',
+  ].join('\n');
   if (!twilioClient) {
-    console.log('[MOCK SMS] Would send to:', guardian.guardianPhone, 'Message:', smsBody);
-    return { success: true, mock: true };
+    console.error('[SMS] Twilio is not configured; SOS SMS was not sent.');
+    return { success: false, error: 'SMS provider is not configured' };
   }
 
   try {
     await twilioClient.messages.create({
-      body: smsBody,
+      body: formattedSmsBody,
       from: process.env.TWILIO_PHONE_NUMBER,
-      to: guardian.guardianPhone
+      // Twilio requires E.164. Guardian records use a 10-digit Indian number.
+      to: toE164IndianNumber(guardian.guardianPhone)
     });
     return { success: true };
   } catch (error) {
@@ -30,18 +53,35 @@ const sendSMSToGuardian = async (guardian, alertData) => {
 
 const triggerSos = async (req, res) => {
   try {
-    const { latitude, longitude, message, triggerSource, threatScore, threatDetails } = req.body;
-    
-    if (!latitude || !longitude) {
+    const { latitude, longitude, message, triggerSource, threatScore, threatDetails,
+            clientSosId, otp, locationType, deliveryMethod, deliveryStatus, smsStatus } = req.body;
+
+    const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
+    const locationUnavailable = locationType === 'unavailable';
+
+    if (!hasCoordinates && !locationUnavailable) {
       return res.status(400).json({ success: false, message: "Latitude and longitude are required" });
     }
 
-    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    if (hasCoordinates && (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180)) {
       return res.status(400).json({ success: false, message: "Invalid latitude or longitude" });
     }
 
+    // Idempotency check: if this clientSosId was already recorded, return existing
+    if (clientSosId) {
+      const existingByClientId = await SosAlert.findOne({ userId: req.userId, clientSosId });
+      if (existingByClientId) {
+        return res.status(200).json({
+          success: true,
+          message: "SOS alert already recorded (idempotent)",
+          alert: existingByClientId,
+          isDuplicateSuppressed: true
+        });
+      }
+    }
+
     const existingAlert = await SosAlert.findOne({ userId: req.userId, status: 'active' });
-    
+
     // Fix #2: De-duplication guard clause
     if (existingAlert) {
       if (triggerSource === 'threat_detection' || threatScore) {
@@ -81,8 +121,8 @@ const triggerSos = async (req, res) => {
       });
     }
 
-    const googleMapsLink = `https://maps.google.com/?q=${latitude},${longitude}`;
-    
+    const googleMapsLink = hasCoordinates ? `https://maps.google.com/?q=${latitude},${longitude}` : null;
+
     const sosAlert = new SosAlert({
       userId: req.userId,
       latitude,
@@ -92,23 +132,34 @@ const triggerSos = async (req, res) => {
       status: 'active',
       triggerSource: triggerSource || 'manual_button',
       threatScore: threatScore || (triggerSource === 'threat_detection' ? 85 : 0),
-      threatDetails: threatDetails || {}
+      threatDetails: threatDetails || {},
+      // Capacitor offline SOS fields (optional, default to online behavior)
+      clientSosId: clientSosId || null,
+      otp: otp || null,
+      locationType: locationType || 'current',
+      deliveryMethod: deliveryMethod || 'online',
+      deliveryStatus: deliveryStatus || 'sent',
     });
 
     const guardians = await Guardian.find({ userId: req.userId });
-    
+
     const alertData = {
       userName: req.user.name,
       userPhone: req.user.phone,
-      googleMapsLink
+      googleMapsLink,
+      latitude,
+      longitude,
+      otp: sosAlert.otp,
+      timestamp: sosAlert.createdAt,
+      smsStatus: smsStatus === 'offline' ? 'offline' : 'online'
     };
 
     let smsSentCount = 0;
     let smsFailedCount = 0;
 
-    if (guardians && guardians.length > 0) {
+    if (guardians && guardians.length > 0 && deliveryMethod !== 'device_sms') {
       const smsResults = await Promise.allSettled(guardians.map(g => sendSMSToGuardian(g, alertData)));
-      
+
       smsResults.forEach(result => {
         if (result.status === 'fulfilled' && result.value.success) {
           smsSentCount++;
@@ -120,6 +171,13 @@ const triggerSos = async (req, res) => {
       sosAlert.guardiansAlerted = guardians.length;
       sosAlert.smsSentCount = smsSentCount;
       sosAlert.smsFailedCount = smsFailedCount;
+    } else if (guardians && guardians.length > 0) {
+      // Android already sent the SOS from the user's SIM. Do not duplicate it
+      // through the server SMS provider when this alert is recorded.
+      smsSentCount = guardians.length;
+      sosAlert.guardiansAlerted = guardians.length;
+      sosAlert.smsSentCount = smsSentCount;
+      sosAlert.smsFailedCount = 0;
     }
 
     await sosAlert.save();
@@ -162,7 +220,7 @@ const triggerSos = async (req, res) => {
 const cancelSos = async (req, res) => {
   try {
     const alert = await SosAlert.findOne({ userId: req.userId, status: 'active' });
-    
+
     if (!alert) {
       return res.status(404).json({ success: false, message: "No active SOS alert found" });
     }
@@ -185,17 +243,17 @@ const cancelSos = async (req, res) => {
     const guardians = await Guardian.find({ userId: req.userId });
     if (guardians && guardians.length > 0) {
       const smsBody = `FALSE ALARM - ${req.user.name} is safe. The SOS alert has been cancelled.`;
-      
+
       const sendSMS = async (guardian) => {
         if (!twilioClient) {
-          console.log('[MOCK SMS] Would send to:', guardian.guardianPhone, 'Message:', smsBody);
-          return { success: true, mock: true };
+          console.error('[SMS] Twilio is not configured; cancellation SMS was not sent.');
+          return { success: false, error: 'SMS provider is not configured' };
         }
         try {
           await twilioClient.messages.create({
             body: smsBody,
             from: process.env.TWILIO_PHONE_NUMBER,
-            to: guardian.guardianPhone
+            to: toE164IndianNumber(guardian.guardianPhone)
           });
           return { success: true };
         } catch (error) {
@@ -215,7 +273,7 @@ const cancelSos = async (req, res) => {
 const markSafe = async (req, res) => {
   try {
     const alert = await SosAlert.findOne({ userId: req.userId, status: 'active' });
-    
+
     if (!alert) {
       return res.status(404).json({ success: false, message: "No active SOS alert found" });
     }
@@ -241,17 +299,17 @@ const markSafe = async (req, res) => {
     const guardians = await Guardian.find({ userId: req.userId });
     if (guardians && guardians.length > 0) {
       const smsBody = `SAFE - ${req.user.name} is now safe. The emergency has been resolved.`;
-      
+
       const sendSMS = async (guardian) => {
         if (!twilioClient) {
-          console.log('[MOCK SMS] Would send to:', guardian.guardianPhone, 'Message:', smsBody);
-          return { success: true, mock: true };
+          console.error('[SMS] Twilio is not configured; safe-status SMS was not sent.');
+          return { success: false, error: 'SMS provider is not configured' };
         }
         try {
           await twilioClient.messages.create({
             body: smsBody,
             from: process.env.TWILIO_PHONE_NUMBER,
-            to: guardian.guardianPhone
+            to: toE164IndianNumber(guardian.guardianPhone)
           });
           return { success: true };
         } catch (error) {
@@ -272,11 +330,11 @@ const getSosHistory = async (req, res) => {
   try {
     const { status } = req.query;
     let query = { userId: req.userId };
-    
+
     if (status && ['active', 'resolved', 'cancelled'].includes(status)) {
       query.status = status;
     }
-    
+
     const alerts = await SosAlert.find(query).sort({ createdAt: -1 }).limit(20);
     return res.status(200).json({ success: true, count: alerts.length, alerts });
   } catch (error) {
@@ -287,7 +345,7 @@ const getSosHistory = async (req, res) => {
 const getActiveSos = async (req, res) => {
   try {
     const alert = await SosAlert.findOne({ userId: req.userId, status: 'active' });
-    
+
     if (!alert) {
       return res.status(200).json({ success: true, hasActiveAlert: false });
     }
