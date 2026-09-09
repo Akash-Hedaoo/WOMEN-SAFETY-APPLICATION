@@ -30,6 +30,8 @@ export default function VoiceSOSListener({ onTriggerVoiceSOS }) {
   const recognitionRef = useRef(null);
   const audioContextRef = useRef(null);
   const micStreamRef = useRef(null);
+  const isListeningRef = useRef(false);
+  const rafIdRef = useRef(null);
 
   // Check browser SpeechRecognition support on mount
   useEffect(() => {
@@ -52,9 +54,15 @@ export default function VoiceSOSListener({ onTriggerVoiceSOS }) {
   const toggleListening = async () => {
     if (isListening) {
       // Stop listening
+      isListeningRef.current = false;
       setIsListening(false);
       setMicState('idle');
       setAudioLevel(0);
+
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
 
       if (recognitionRef.current) {
         try {
@@ -92,13 +100,13 @@ export default function VoiceSOSListener({ onTriggerVoiceSOS }) {
             const dataArray = new Uint8Array(bufferLength);
 
             const checkVolume = () => {
-              if (!micStreamRef.current) return;
+              if (!micStreamRef.current || !isListeningRef.current) return;
               analyser.getByteFrequencyData(dataArray);
               let sum = 0;
               for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
               const avg = sum / bufferLength;
               setAudioLevel(Math.min(100, Math.round((avg / 64) * 100)));
-              requestAnimationFrame(checkVolume);
+              rafIdRef.current = requestAnimationFrame(checkVolume);
             };
             checkVolume();
           }
@@ -138,8 +146,8 @@ export default function VoiceSOSListener({ onTriggerVoiceSOS }) {
           };
 
           recognition.onend = () => {
-            // Auto-restart if listening is still enabled
-            if (isListening && micState !== 'denied') {
+            // Auto-restart if listening is still enabled (use ref to avoid stale closure)
+            if (isListeningRef.current && micState !== 'denied') {
               try {
                 recognition.start();
               } catch (e) {
@@ -152,6 +160,7 @@ export default function VoiceSOSListener({ onTriggerVoiceSOS }) {
           recognitionRef.current = recognition;
         }
 
+        isListeningRef.current = true;
         setIsListening(true);
         setMicState('listening');
       } catch (err) {

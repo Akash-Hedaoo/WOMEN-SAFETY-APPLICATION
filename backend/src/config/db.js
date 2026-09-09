@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
-  const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/safe-era';
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/safe-era';
   try {
     const conn = await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 5000

@@ -60,7 +60,17 @@ export default function Dashboard() {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => setMapLocation([position.coords.latitude, position.coords.longitude]),
-        () => void 0
+        () => {
+          fetch('https://ipwho.is/')
+            .then(res => res.json())
+            .then(data => {
+              if (data && data.latitude && data.longitude) {
+                setMapLocation([data.latitude, data.longitude]);
+              }
+            })
+            .catch(() => void 0);
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
       );
     }
   }, []);

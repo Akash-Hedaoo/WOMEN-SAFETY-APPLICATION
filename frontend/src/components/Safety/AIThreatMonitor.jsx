@@ -21,6 +21,7 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
 
   const audioContextRef = useRef(null);
   const micStreamRef = useRef(null);
+  const rafIdRef = useRef(null);
 
   // Calculate overall weighted score (0 - 100)
   const overallThreatScore = Math.min(
@@ -66,7 +67,7 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
             // Map average (0-128) to audio score
             const calculatedAudio = Math.min(100, Math.round((average / 128) * 100));
             setAudioScore((prev) => Math.max(calculatedAudio, Math.max(5, prev - 2)));
-            requestAnimationFrame(updateVolume);
+            rafIdRef.current = requestAnimationFrame(updateVolume);
           };
           updateVolume();
         }
@@ -94,7 +95,29 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
     }
 
     setIsEnabled(true);
+
+    // Cleanup RAF on disable
+    return () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+    };
   };
+
+  // Cancel RAF loop when monitoring is disabled or on unmount
+  useEffect(() => {
+    if (!isEnabled && rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    return () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+    };
+  }, [isEnabled]);
 
   // Device Motion Listener
   useEffect(() => {
