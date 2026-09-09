@@ -27,9 +27,9 @@ export default function Pricing() {
     <div className="page-shell min-h-screen pt-28">
       <div className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Plans</p>
-          <h1 className="mt-3 font-headline text-4xl font-semibold text-white md:text-6xl">Pricing that feels premium</h1>
-          <p className="mt-4 text-lg text-slate-300">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#7A8E72]">Plans</p>
+          <h1 className="mt-3 font-headline text-4xl font-semibold text-[#28302A] md:text-6xl">Pricing that feels premium</h1>
+          <p className="mt-4 text-lg text-[#687067]">
             The product now presents pricing as a clean decision surface, not a standard sales table.
           </p>
         </div>
@@ -39,7 +39,7 @@ export default function Pricing() {
         </div>
 
         <div className="mt-20">
-          <h2 className="mb-8 text-center font-headline text-3xl font-semibold text-white">Frequently asked questions</h2>
+          <h2 className="mb-8 text-center font-headline text-3xl font-semibold text-[#28302A]">Frequently asked questions</h2>
           <FAQAccordion />
         </div>
       </div>

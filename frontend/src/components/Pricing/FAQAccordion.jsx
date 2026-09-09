@@ -17,17 +17,17 @@ export default function FAQAccordion() {
             {FAQ_DATA.map((faq, idx) => (
                 <div key={idx} className="premium-panel overflow-hidden">
                     <button
-                        className="flex w-full items-center justify-between px-5 py-4 text-left font-semibold text-white transition hover:bg-white/5"
+                        className="flex w-full items-center justify-between px-5 py-4 text-left font-semibold text-[#28302A] transition hover:bg-[#FAF8F5]"
                         onClick={() => toggle(idx)}
                     >
                         {faq.q}
-                        <span className="material-symbols-outlined text-violet-200">
+                        <span className="material-symbols-outlined text-[#7A8E72]">
                             {openIdx === idx ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}
                         </span>
                     </button>
 
                     {openIdx === idx && (
-                        <div className="border-t border-white/10 px-5 py-4 text-sm text-slate-300">
+                        <div className="border-t border-[#DCDDD5] px-5 py-4 text-sm text-[#687067]">
                             {faq.a}
                         </div>
                     )}

@@ -68,7 +68,7 @@ export default {
           var(--shadow-spread)
           var(--shadow-color)
         `,
-        glow: "0 24px 80px rgba(139, 92, 246, 0.24)",
+        glow: "0 16px 40px rgba(122, 142, 114, 0.15)",
       },
     },
   },

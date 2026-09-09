@@ -3,10 +3,10 @@ import FormInput from './FormInput';
 
 export default function EmergencyContactSection({ contactName, setContactName, contactPhone, setContactPhone }) {
     return (
-        <div className="premium-panel p-5 mt-6">
+        <div className="premium-panel p-5 mt-6 bg-white border border-[#DCDDD5] shadow-sm">
             <div className="flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-violet-300 text-sm">contact_emergency</span>
-                <h4 className="font-label font-semibold text-white text-sm">Primary Emergency Contact</h4>
+                <span className="material-symbols-outlined text-[#7A8E72] text-sm">contact_emergency</span>
+                <h4 className="font-label font-semibold text-[#28302A] text-sm">Primary Emergency Contact</h4>
             </div>
             <div className="space-y-4">
                 <FormInput

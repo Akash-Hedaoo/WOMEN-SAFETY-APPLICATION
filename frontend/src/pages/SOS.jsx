@@ -94,7 +94,7 @@ export default function SOSPage() {
               action: `${sourceLabel} (Score: ${a.threatScore || 0})`,
               time: `${dateStr}, ${timeStr}`,
               status: a.status === 'active' ? 'Active' : a.status === 'resolved' ? 'Resolved' : 'Cancelled',
-              statusColor: a.status === 'active' ? 'text-rose-400' : a.status === 'resolved' ? 'text-emerald-400' : 'text-slate-400'
+              statusColor: a.status === 'active' ? 'text-[#C62828]' : a.status === 'resolved' ? 'text-[#4F7D55]' : 'text-[#687067]'
             };
           });
           setLogs(formatted);
@@ -324,9 +324,9 @@ export default function SOSPage() {
     <div className="page-shell min-h-screen pt-24 pb-12">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-rose-500/40 bg-slate-950/95 px-6 py-3.5 text-sm text-white shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[#DCDDD5] bg-white px-6 py-3.5 text-sm text-[#28302A] shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4">
           <span className="inline-flex items-center gap-2 font-medium">
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            <CheckCircle2 className="h-4 w-4 text-[#4F7D55]" />
             {toastMessage}
           </span>
         </div>
@@ -337,12 +337,12 @@ export default function SOSPage() {
         <div
           className={`rounded-[28px] border px-6 py-4 text-center text-xs font-bold uppercase tracking-[0.24em] transition-all flex items-center justify-center gap-2.5 ${
             stage === 'active'
-              ? 'border-rose-400/40 bg-rose-500/20 text-rose-100 shadow-[0_0_30px_rgba(244,63,94,0.3)] animate-pulse'
+              ? 'border-[#C62828]/40 bg-[#C62828]/15 text-[#C62828] shadow-[0_0_24px_rgba(198,40,40,0.2)] animate-pulse'
               : stage === 'confirming'
-              ? 'border-amber-400/40 bg-amber-500/20 text-amber-100'
+              ? 'border-[#C18A32]/40 bg-[#C18A32]/15 text-[#C18A32]'
               : stage === 'safe'
-              ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-100'
-              : 'border-white/10 bg-white/6 text-slate-300'
+              ? 'border-[#4F7D55]/40 bg-[#4F7D55]/15 text-[#4F7D55]'
+              : 'border-[#DCDDD5] bg-white text-[#687067] shadow-sm'
           }`}
         >
           {stage === 'idle' && '🟢 Safe-Era Active · All Safety Channels Standing By'}
@@ -353,13 +353,13 @@ export default function SOSPage() {
         </div>
 
         {/* Safety Mode Tabs */}
-        <div className="flex items-center justify-center gap-2 border-b border-white/10 pb-4">
+        <div className="flex items-center justify-center gap-2 border-b border-[#DCDDD5] pb-4">
           <button
             onClick={() => setActiveTab('MANUAL')}
             className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
               activeTab === 'MANUAL'
-                ? 'bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-lg shadow-rose-500/30'
-                : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                ? 'bg-[#C62828] text-white shadow-md shadow-[#C62828]/25'
+                : 'bg-white text-[#687067] border border-[#DCDDD5] hover:bg-[#FAF0EA] hover:text-[#28302A]'
             }`}
           >
             <ShieldAlert className="h-4 w-4" /> Manual SOS Button
@@ -369,8 +369,8 @@ export default function SOSPage() {
             onClick={() => setActiveTab('THREAT_AI')}
             className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
               activeTab === 'THREAT_AI'
-                ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-600/30'
-                : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                ? 'bg-[#7A8E72] text-white shadow-md shadow-[#7A8E72]/25'
+                : 'bg-white text-[#687067] border border-[#DCDDD5] hover:bg-[#FAF0EA] hover:text-[#28302A]'
             }`}
           >
             <Activity className="h-4 w-4" /> AI Threat Detection
@@ -380,8 +380,8 @@ export default function SOSPage() {
             onClick={() => setActiveTab('VOICE')}
             className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
               activeTab === 'VOICE'
-                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-500/30'
-                : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                ? 'bg-[#7A8E72] text-white shadow-md shadow-[#7A8E72]/25'
+                : 'bg-white text-[#687067] border border-[#DCDDD5] hover:bg-[#FAF0EA] hover:text-[#28302A]'
             }`}
           >
             <Volume2 className="h-4 w-4" /> Voice-Triggered SOS
@@ -393,11 +393,11 @@ export default function SOSPage() {
           <div className="space-y-6">
             {/* Tab 1: Manual SOS Button */}
             {activeTab === 'MANUAL' && (
-              <section className="premium-panel-strong p-6 md:p-8 rounded-[28px] border border-white/10 bg-slate-900/80 backdrop-blur-xl">
+              <section className="premium-panel-strong p-6 md:p-8 rounded-[28px] border border-[#DCDDD5] bg-white shadow-sm">
                 <div className="mx-auto flex max-w-xl flex-col items-center text-center">
                   <div className="relative flex items-center justify-center">
                     {stage === 'active' && (
-                      <div className="absolute h-80 w-80 rounded-full bg-rose-500/25 blur-3xl animate-pulse" />
+                      <div className="absolute h-80 w-80 rounded-full bg-[#C62828]/20 blur-3xl animate-pulse" />
                     )}
 
                     <button
@@ -405,10 +405,10 @@ export default function SOSPage() {
                       disabled={stage === 'active'}
                       className={`relative flex h-64 w-64 items-center justify-center rounded-full border shadow-2xl transition-all duration-300 ${
                         stage === 'idle' || stage === 'cancelled' || stage === 'safe'
-                          ? 'border-rose-300/40 bg-gradient-to-br from-rose-500 to-pink-600 hover:scale-105 active:scale-95 shadow-rose-600/40'
+                          ? 'border-[#C62828]/60 bg-[#C62828] hover:bg-[#b02222] hover:scale-105 active:scale-95 shadow-[0_12px_32px_rgba(198,40,40,0.35)]'
                           : ''
-                      } ${stage === 'confirming' ? 'border-amber-300/50 bg-gradient-to-br from-amber-500 to-orange-600 scale-105 animate-bounce' : ''} ${
-                        stage === 'active' ? 'border-rose-400/50 bg-gradient-to-br from-slate-950 via-rose-950 to-rose-700 shadow-rose-600/50' : ''
+                      } ${stage === 'confirming' ? 'border-[#C18A32]/60 bg-[#C18A32] scale-105 animate-bounce' : ''} ${
+                        stage === 'active' ? 'border-[#C62828]/60 bg-[#9B1C1C] shadow-[0_12px_32px_rgba(198,40,40,0.45)]' : ''
                       }`}
                     >
                       {(stage === 'idle' || stage === 'cancelled' || stage === 'safe') && (
@@ -430,11 +430,11 @@ export default function SOSPage() {
 
                       {stage === 'active' && (
                         <div className="space-y-3 text-white">
-                          <Clock className="mx-auto h-10 w-10 text-rose-300 animate-spin-slow" />
+                          <Clock className="mx-auto h-10 w-10 text-rose-200 animate-spin-slow" />
                           <div className="font-mono text-4xl font-bold">
                             {String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}
                           </div>
-                          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-rose-200">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-rose-100">
                             🚨 SOS Dispatched
                           </p>
                         </div>
@@ -448,13 +448,13 @@ export default function SOSPage() {
                       <>
                         <button
                           onClick={handleMarkSafe}
-                          className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs tracking-wider uppercase transition shadow-lg shadow-emerald-600/30"
+                          className="px-6 py-3 rounded-2xl bg-[#4F7D55] hover:bg-[#436b48] text-white font-bold text-xs tracking-wider uppercase transition shadow-md"
                         >
                           ✓ Mark Myself Safe
                         </button>
                         <button
                           onClick={handleCancelSOS}
-                          className="px-6 py-3 rounded-2xl bg-rose-600/80 hover:bg-rose-600 text-white font-bold text-xs tracking-wider uppercase transition border border-rose-400/30"
+                          className="px-6 py-3 rounded-2xl bg-[#C62828] hover:bg-[#b02222] text-white font-bold text-xs tracking-wider uppercase transition"
                         >
                           Cancel SOS Alert
                         </button>
@@ -463,13 +463,13 @@ export default function SOSPage() {
                       <>
                         <button
                           onClick={() => triggerSosApi({ triggerSource: 'manual_button', message: 'Test emergency drill' })}
-                          className="px-5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 font-semibold text-xs tracking-wider uppercase transition border border-white/10"
+                          className="px-5 py-2.5 rounded-2xl bg-[#FAF0EA] hover:bg-[#f3e5dc] text-[#28302A] font-semibold text-xs tracking-wider uppercase transition border border-[#DCDDD5]"
                         >
                           Trigger Instant SOS
                         </button>
                         <button
                           onClick={handleCancelSOS}
-                          className="px-5 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-semibold text-xs tracking-wider uppercase transition"
+                          className="px-5 py-2.5 rounded-2xl bg-white hover:bg-[#FAF8F5] text-[#687067] hover:text-[#28302A] font-semibold text-xs tracking-wider uppercase transition border border-[#DCDDD5]"
                         >
                           Reset Status
                         </button>
@@ -499,15 +499,15 @@ export default function SOSPage() {
           {/* Right Sidebar: Real Guardians & Real DB Logs */}
           <aside className="space-y-6">
             {/* Real Guardians Panel */}
-            <div className="premium-panel p-6 rounded-[28px] border border-white/10 bg-slate-900/80 backdrop-blur-xl">
+            <div className="premium-panel p-6 rounded-[28px] border border-[#DCDDD5] bg-white shadow-sm">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <Users className="h-5 w-5 text-violet-300" />
-                  <h2 className="font-headline text-xl font-bold text-white">Emergency Guardians</h2>
+                  <Users className="h-5 w-5 text-[#7A8E72]" />
+                  <h2 className="font-headline text-xl font-bold text-[#28302A]">Emergency Guardians</h2>
                 </div>
                 <Link
                   to={ROUTES.GUARDIANS}
-                  className="text-xs font-semibold text-violet-300 hover:text-violet-200 inline-flex items-center gap-1"
+                  className="text-xs font-semibold text-[#7A8E72] hover:text-[#5e6e58] inline-flex items-center gap-1"
                 >
                   Manage <ArrowRight className="h-3 w-3" />
                 </Link>
@@ -515,13 +515,13 @@ export default function SOSPage() {
 
               <div className="space-y-3">
                 {isLoadingGuardians ? (
-                  <div className="p-4 text-center text-xs text-slate-400">Loading guardians from database...</div>
+                  <div className="p-4 text-center text-xs text-[#687067]">Loading guardians from database...</div>
                 ) : guardiansList.length === 0 ? (
-                  <div className="p-5 text-center rounded-2xl border border-white/10 bg-white/5">
-                    <p className="text-xs text-slate-400 mb-2">No guardians linked yet.</p>
+                  <div className="p-5 text-center rounded-2xl border border-[#DCDDD5] bg-[#FAF8F5]">
+                    <p className="text-xs text-[#687067] mb-2">No guardians linked yet.</p>
                     <Link
                       to={ROUTES.GUARDIANS}
-                      className="inline-block px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold"
+                      className="inline-block px-4 py-2 rounded-xl bg-[#7A8E72] hover:bg-[#66775f] text-white text-xs font-semibold"
                     >
                       + Add Guardian Contact
                     </Link>
@@ -530,21 +530,21 @@ export default function SOSPage() {
                   guardiansList.map((g, idx) => (
                     <div
                       key={g._id || idx}
-                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3.5"
+                      className="flex items-center justify-between rounded-2xl border border-[#DCDDD5] bg-[#FAF8F5] p-3.5"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl text-white font-bold bg-violet-600/30 border border-violet-400/30 text-sm">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl text-[#7A8E72] font-bold bg-[#FAF0EA] border border-[#DCDDD5] text-sm">
                           {g.guardianName ? g.guardianName[0].toUpperCase() : 'G'}
                         </div>
                         <div>
-                          <p className="font-semibold text-white text-sm leading-tight">{g.guardianName}</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
+                          <p className="font-semibold text-[#28302A] text-sm leading-tight">{g.guardianName}</p>
+                          <p className="text-[11px] text-[#687067] mt-0.5">
                             {g.relation} • {g.guardianPhone}
                           </p>
                         </div>
                       </div>
                       <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                        g.isVerified ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300'
+                        g.isVerified ? 'bg-[#4F7D55]/15 text-[#4F7D55] border border-[#4F7D55]/30' : 'bg-[#C18A32]/15 text-[#C18A32]'
                       }`}>
                         {g.isVerified ? 'Linked ✓' : 'Pending OTP'}
                       </span>
@@ -555,15 +555,15 @@ export default function SOSPage() {
             </div>
 
             {/* Real SOS Incident Logs from DB */}
-            <div className="premium-panel p-6 rounded-[28px] border border-white/10 bg-slate-900/80 backdrop-blur-xl">
+            <div className="premium-panel p-6 rounded-[28px] border border-[#DCDDD5] bg-white shadow-sm">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <Clock className="h-5 w-5 text-violet-300" />
-                  <h2 className="font-headline text-xl font-bold text-white">Recent SOS Logs</h2>
+                  <Clock className="h-5 w-5 text-[#7A8E72]" />
+                  <h2 className="font-headline text-xl font-bold text-[#28302A]">Recent SOS Logs</h2>
                 </div>
                 <button
                   onClick={fetchSosHistory}
-                  className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition"
+                  className="p-1.5 rounded-lg hover:bg-[#FAF0EA] text-[#687067] hover:text-[#28302A] transition"
                   title="Refresh Logs"
                 >
                   <RefreshCw className="h-4 w-4" />
@@ -572,19 +572,19 @@ export default function SOSPage() {
 
               <div className="space-y-3">
                 {isLoadingLogs ? (
-                  <div className="p-4 text-center text-xs text-slate-400">Loading incident records...</div>
+                  <div className="p-4 text-center text-xs text-[#687067]">Loading incident records...</div>
                 ) : logs.length === 0 ? (
-                  <div className="p-5 text-center text-xs text-slate-400 rounded-2xl border border-white/10 bg-white/5">
+                  <div className="p-5 text-center text-xs text-[#687067] rounded-2xl border border-[#DCDDD5] bg-[#FAF8F5]">
                     No past SOS alerts recorded. You are fully secure.
                   </div>
                 ) : (
                   logs.slice(0, 5).map((log) => (
-                    <div key={log.id} className="rounded-2xl border border-white/10 bg-white/5 p-3.5 flex items-center justify-between gap-3">
+                    <div key={log.id} className="rounded-2xl border border-[#DCDDD5] bg-[#FAF8F5] p-3.5 flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-white text-xs leading-snug">{log.action}</p>
-                        <p className="mt-1 text-[11px] text-slate-400">{log.time}</p>
+                        <p className="font-semibold text-[#28302A] text-xs leading-snug">{log.action}</p>
+                        <p className="mt-1 text-[11px] text-[#687067]">{log.time}</p>
                       </div>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/5 ${log.statusColor}`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white border border-[#DCDDD5] ${log.statusColor}`}>
                         {log.status}
                       </span>
                     </div>

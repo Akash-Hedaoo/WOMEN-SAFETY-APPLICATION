@@ -15,7 +15,7 @@ export default function DashboardSidebar() {
     const location = useLocation();
 
     return (
-        <aside className="hidden h-full w-72 shrink-0 border-r border-white/10 bg-white/5 p-4 backdrop-blur-2xl md:block">
+        <aside className="hidden h-full w-72 shrink-0 border-r border-[#DCDDD5] bg-white/95 p-4 backdrop-blur-2xl md:block">
             <nav className="space-y-2">
                 {links.map((link) => {
                     const active = location.pathname === link.path;
@@ -24,10 +24,10 @@ export default function DashboardSidebar() {
                             key={link.path}
                             to={link.path}
                             className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all ${
-                                active ? 'bg-white text-slate-950 shadow-lg' : 'text-slate-200 hover:bg-white/10'
+                                active ? 'bg-[#A8B8A0]/30 text-[#28302A] border border-[#A8B8A0]/50 font-semibold shadow-sm' : 'text-[#687067] hover:bg-[#FAF8F5] hover:text-[#28302A]'
                             }`}
                         >
-                            <span className={`material-symbols-outlined ${active ? 'text-violet-600' : 'text-violet-300'}`}>{link.icon}</span>
+                            <span className={`material-symbols-outlined ${active ? 'text-[#7A8E72]' : 'text-[#A8B8A0]'}`}>{link.icon}</span>
                             {link.name}
                         </Link>
                     );

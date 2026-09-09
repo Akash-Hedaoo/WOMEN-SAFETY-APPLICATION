@@ -10,17 +10,17 @@ const customMarkerStyle = `
     border: none !important;
   }
   .leaflet-popup-content-wrapper {
-    background: rgba(15, 23, 42, 0.95) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
     backdrop-filter: blur(16px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid #DCDDD5 !important;
     border-radius: 18px !important;
-    box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.6) !important;
-    color: #ffffff !important;
+    box-shadow: 0 16px 30px -8px rgba(40, 48, 42, 0.15) !important;
+    color: #28302A !important;
     padding: 4px !important;
   }
   .leaflet-popup-tip {
-    background: rgba(15, 23, 42, 0.95) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    border: 1px solid #DCDDD5 !important;
   }
   .leaflet-container {
     font-family: inherit !important;
@@ -33,21 +33,21 @@ const createIcon = (type, isSelected = false) => {
   let bgColor, iconSvg, borderColor;
 
   if (t.includes('police')) {
-    bgColor = isSelected ? '#06b6d4' : '#0891b2';
-    borderColor = '#67e8f9';
+    bgColor = isSelected ? '#7A8E72' : '#8fa187';
+    borderColor = '#5e6e58';
     iconSvg = `<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
   } else if (t.includes('hospital') || t.includes('clinic') || t.includes('medical')) {
-    bgColor = isSelected ? '#f43f5e' : '#e11d48';
-    borderColor = '#fda4af';
+    bgColor = isSelected ? '#C62828' : '#d93838';
+    borderColor = '#9b1c1c';
     iconSvg = `<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6v12M6 12h12"/><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg>`;
   } else if (t.includes('sos') || t.includes('incident') || t.includes('alert')) {
-    bgColor = '#ef4444';
-    borderColor = '#fca5a5';
+    bgColor = '#C62828';
+    borderColor = '#9b1c1c';
     iconSvg = `<svg class="w-5 h-5 text-white animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
   } else {
     // Safe Zone / Community Hub
-    bgColor = isSelected ? '#8b5cf6' : '#7c3aed';
-    borderColor = '#c4b5fd';
+    bgColor = isSelected ? '#7A8E72' : '#A8B8A0';
+    borderColor = '#5e6e58';
     iconSvg = `<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`;
   }
 
@@ -73,10 +73,10 @@ const userIcon = new L.DivIcon({
   className: 'custom-leaflet-marker',
   html: `
     <div class="relative flex items-center justify-center w-14 h-14">
-      <div class="absolute w-14 h-14 bg-violet-500/25 rounded-full animate-ping"></div>
-      <div class="absolute w-9 h-9 bg-violet-600/40 rounded-full animate-pulse"></div>
-      <div class="w-7 h-7 rounded-full bg-slate-950 shadow-2xl flex items-center justify-center z-10 border-2 border-violet-400">
-        <div class="w-3.5 h-3.5 rounded-full bg-violet-300 shadow-[0_0_12px_rgba(196,181,253,0.9)]"></div>
+      <div class="absolute w-14 h-14 bg-[#7A8E72]/25 rounded-full animate-ping"></div>
+      <div class="absolute w-9 h-9 bg-[#7A8E72]/40 rounded-full animate-pulse"></div>
+      <div class="w-7 h-7 rounded-full bg-white shadow-2xl flex items-center justify-center z-10 border-2 border-[#7A8E72]">
+        <div class="w-3.5 h-3.5 rounded-full bg-[#7A8E72] shadow-[0_0_10px_rgba(122,142,114,0.7)]"></div>
       </div>
     </div>
   `,
@@ -127,7 +127,7 @@ export default function CustomMapContainer({
     : validCenter;
 
   return (
-    <div className="relative w-full h-full min-h-[420px] overflow-hidden rounded-[20px] bg-slate-950">
+    <div className="relative w-full h-full min-h-[420px] overflow-hidden rounded-[20px] bg-[#FAF8F5]">
       <style>{customMarkerStyle}</style>
       <LeafletMap
         center={validCenter}
@@ -145,13 +145,13 @@ export default function CustomMapContainer({
 
         {/* User Current Live Location Marker */}
         <Marker position={validUserLoc} icon={userIcon}>
-          <Popup className="text-white">
+          <Popup className="text-[#28302A]">
             <div className="p-2 text-center">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 text-[11px] font-semibold uppercase tracking-wider mb-1">
-                <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse"></span>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FAF0EA] text-[#7A8E72] text-[11px] font-semibold uppercase tracking-wider mb-1 border border-[#DCDDD5]">
+                <span className="w-2 h-2 rounded-full bg-[#7A8E72] animate-pulse"></span>
                 You are here
               </div>
-              <p className="text-xs text-slate-300 font-mono mt-1">
+              <p className="text-xs text-[#687067] font-mono mt-1">
                 {validUserLoc[0].toFixed(5)}, {validUserLoc[1].toFixed(5)}
               </p>
             </div>
@@ -181,30 +181,30 @@ export default function CustomMapContainer({
               <Popup>
                 <div className="p-2.5 max-w-[220px]">
                   <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="px-2 py-0.5 rounded-md bg-white/10 text-[10px] font-bold uppercase tracking-wider text-violet-300">
+                    <span className="px-2 py-0.5 rounded-md bg-[#FAF0EA] text-[10px] font-bold uppercase tracking-wider text-[#7A8E72] border border-[#DCDDD5]">
                       {poi.type || 'Safe Place'}
                     </span>
                     {poi.rating && (
-                      <span className="text-amber-300 text-xs font-semibold flex items-center gap-1">
+                      <span className="text-[#C18A32] text-xs font-semibold flex items-center gap-1">
                         ★ {poi.rating}
                       </span>
                     )}
                   </div>
-                  <h4 className="font-semibold text-white text-sm leading-snug">{poi.name}</h4>
+                  <h4 className="font-semibold text-[#28302A] text-sm leading-snug">{poi.name}</h4>
                   {poi.distance && (
-                    <p className="text-xs text-slate-300 mt-1 flex items-center gap-1 font-medium">
+                    <p className="text-xs text-[#687067] mt-1 flex items-center gap-1 font-medium">
                       📍 {poi.distance} away
                     </p>
                   )}
                   {poi.status && (
-                    <p className="text-[11px] text-slate-400 mt-0.5">{poi.status}</p>
+                    <p className="text-[11px] text-[#687067] mt-0.5">{poi.status}</p>
                   )}
                   
                   <a
                     href={navUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-3 block w-full py-1.5 px-3 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold text-center transition"
+                    className="mt-3 block w-full py-1.5 px-3 rounded-lg bg-[#7A8E72] hover:bg-[#66775f] text-white text-xs font-semibold text-center transition"
                   >
                     Directions ↗
                   </a>

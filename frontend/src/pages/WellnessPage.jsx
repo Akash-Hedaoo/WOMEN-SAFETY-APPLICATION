@@ -43,17 +43,17 @@ export default function WellnessPage() {
 
   return (
     <div className="page-shell mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-      {toast && <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-white/10 bg-slate-950/90 px-5 py-3 text-sm text-white shadow-2xl backdrop-blur-xl">{toast}</div>}
+      {toast && <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[#DCDDD5] bg-white px-5 py-3 text-sm text-[#28302A] shadow-2xl backdrop-blur-xl">{toast}</div>}
 
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Wellness</p>
-          <h1 className="mt-3 font-headline text-4xl font-semibold text-white md:text-5xl">Guides for safety and composure</h1>
-          <p className="mt-3 text-slate-300">Premium presentation, same educational content.</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#7A8E72]">Wellness</p>
+          <h1 className="mt-3 font-headline text-4xl font-semibold text-[#28302A] md:text-5xl">Guides for safety and composure</h1>
+          <p className="mt-3 text-[#687067]">Curated educational resources and personal safety guidance.</p>
         </div>
         <div className="relative w-full max-w-md">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input className="premium-input pl-11" placeholder="Search guides" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#687067]" />
+          <input className="premium-input pl-11 bg-white text-[#28302A] border-[#DCDDD5]" placeholder="Search guides" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
         </div>
       </div>
 
@@ -62,7 +62,7 @@ export default function WellnessPage() {
           <button
             key={category}
             onClick={() => setActiveCategory(category)}
-            className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition ${activeCategory === category ? 'bg-white text-slate-950' : 'bg-white/6 text-slate-300 hover:bg-white/10'}`}
+            className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition ${activeCategory === category ? 'bg-[#7A8E72] text-white shadow-sm' : 'bg-white text-[#687067] border border-[#DCDDD5] hover:bg-[#FAF0EA] hover:text-[#28302A]'}`}
           >
             {category}
           </button>
@@ -71,13 +71,13 @@ export default function WellnessPage() {
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {filteredGuides.map((guide) => (
-          <article key={guide.id} className="card-premium flex flex-col">
-            <div className="mb-4 flex items-center justify-between text-xs text-slate-400">
-              <span className="premium-chip">{guide.category}</span>
+          <article key={guide.id} className="card-premium flex flex-col bg-white border border-[#DCDDD5] shadow-sm">
+            <div className="mb-4 flex items-center justify-between text-xs text-[#687067]">
+              <span className="premium-chip bg-[#FAF0EA] border border-[#DCDDD5] text-[#7A8E72]">{guide.category}</span>
               <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {guide.time}</span>
             </div>
-            <h2 className="font-headline text-2xl font-semibold text-white">{guide.title}</h2>
-            <p className="mt-4 flex-1 text-sm leading-relaxed text-slate-300">{guide.desc}</p>
+            <h2 className="font-headline text-2xl font-semibold text-[#28302A]">{guide.title}</h2>
+            <p className="mt-4 flex-1 text-sm leading-relaxed text-[#687067]">{guide.desc}</p>
             <div className="mt-6 flex items-center gap-3">
               <button onClick={() => toggleBookmark(guide.id)} className="btn-secondary">
                 <Bookmark className="h-4 w-4" />

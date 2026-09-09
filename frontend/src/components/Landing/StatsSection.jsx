@@ -36,35 +36,35 @@ const STATS = [
 
 export default function StatsSection() {
   return (
-    <section className="relative border-y border-white/10 bg-slate-950/70 py-20 backdrop-blur-xl">
+    <section className="relative border-y border-[#DCDDD5] bg-[#FAF8F5] py-20">
       <div className="mx-auto max-w-7xl px-6 md:px-8">
         <div className="grid gap-6 lg:grid-cols-12 lg:items-end">
           <div className="lg:col-span-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-violet-200">Trusted at scale</p>
-            <h2 className="mt-3 font-headline text-3xl font-semibold text-white md:text-5xl">Impact that reads like a premium report</h2>
-            <p className="mt-4 max-w-xl text-slate-300">Instead of a uniform row of cards, the numbers now sit in a more editorial composition.</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#7A8E72]">Trusted at scale</p>
+            <h2 className="mt-3 font-headline text-3xl font-semibold text-[#28302A] md:text-5xl">Impact that reads like a premium report</h2>
+            <p className="mt-4 max-w-xl text-[#687067]">Instead of a uniform row of cards, the numbers now sit in a more editorial composition.</p>
           </div>
 
           <div className="lg:col-span-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <div className="premium-panel p-6 xl:col-span-2 xl:row-span-2">
-              <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/30 to-pink-500/20 text-violet-200">
+              <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#A8B8A0]/25 text-[#7A8E72]">
                 <span className="material-symbols-outlined">{STATS[0].icon}</span>
               </div>
-              <div className="font-headline text-5xl font-semibold text-white tabular-nums">
+              <div className="font-headline text-5xl font-semibold text-[#28302A] tabular-nums">
                 <AnimatedCounter end={STATS[0].value} suffix={STATS[0].suffix} />
               </div>
-              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{STATS[0].label}</p>
+              <p className="mt-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#687067]">{STATS[0].label}</p>
             </div>
 
             {STATS.slice(1).map((stat) => (
               <div key={stat.label} className="premium-panel p-6">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500/30 to-pink-500/20 text-violet-200">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#A8B8A0]/25 text-[#7A8E72]">
                   <span className="material-symbols-outlined">{stat.icon}</span>
                 </div>
-                <div className="font-headline text-4xl font-semibold text-white tabular-nums">
+                <div className="font-headline text-4xl font-semibold text-[#28302A] tabular-nums">
                   {stat.prefix || ''}<AnimatedCounter end={stat.value} suffix={stat.suffix} />
                 </div>
-                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{stat.label}</p>
+                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#687067]">{stat.label}</p>
               </div>
             ))}
           </div>
