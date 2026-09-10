@@ -1,9 +1,8 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Clock, ShieldAlert, Users, Phone, Activity, Volume2, Radio, AlertTriangle, ArrowRight, RefreshCw, Wifi, WifiOff, MessageSquare, Save } from 'lucide-react';
+import { CheckCircle2, Clock, ShieldAlert, Users, Phone, Activity, Radio, AlertTriangle, ArrowRight, RefreshCw, Wifi, WifiOff, MessageSquare, Save } from 'lucide-react';
 import io from 'socket.io-client';
 import AIThreatMonitor from '../components/Safety/AIThreatMonitor';
-import VoiceSOSListener from '../components/Safety/VoiceSOSListener';
 import { API_BASE_URL, ROUTES } from '../utils/constants';
 import { triggerSOS as triggerSOSService, startAutoSync } from '../services/sosService';
 import { syncGuardians } from '../services/guardianCacheService';
@@ -384,16 +383,6 @@ export default function SOSPage() {
           >
             <Activity className="h-4 w-4" /> AI Threat Detection
           </button>
-
-          <button
-            onClick={() => setActiveTab('VOICE')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === 'VOICE'
-                ? 'bg-[#7A8E72] text-white shadow-md shadow-[#7A8E72]/25'
-                : 'bg-white text-[#687067] border border-[#DCDDD5] hover:bg-[#FAF0EA] hover:text-[#28302A]'
-              }`}
-          >
-            <Volume2 className="h-4 w-4" /> Voice-Triggered SOS
-          </button>
         </div>
 
         {/* Main Workspace Layout */}
@@ -529,13 +518,6 @@ export default function SOSPage() {
               <AIThreatMonitor
                 onTriggerAutoSOS={(threatPayload) => triggerSosApi(threatPayload)}
                 activeIncident={stage === 'active' ? activeAlertDetails : null}
-              />
-            )}
-
-            {/* Tab 3: Voice-Triggered SOS */}
-            {activeTab === 'VOICE' && (
-              <VoiceSOSListener
-                onTriggerVoiceSOS={(voicePayload) => triggerSosApi(voicePayload)}
               />
             )}
           </div>
