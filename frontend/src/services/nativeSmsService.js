@@ -1,10 +1,6 @@
 /**
- * Native SMS Service — wraps @capawesome/capacitor-sms-composer
- * to open the native SMS compose screen pre-filled with emergency data.
- *
- * NOTE: This plugin does NOT auto-send. It opens the system SMS app
- * with recipient + body pre-filled. The user taps Send.
- * This is the safest universal approach — no SEND_SMS permission needed.
+ * Native SMS Service — wraps EmergencySms Capacitor Plugin and @capawesome/capacitor-sms-composer
+ * to send emergency SMS directly from the device's SIM/eSIM or open the native SMS composer.
  */
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
@@ -12,16 +8,15 @@ const EmergencySms = registerPlugin('EmergencySms');
 
 const toSmsRecipient = (phoneNumber) => {
   const digits = String(phoneNumber || '').replace(/\D/g, '');
-  // Guardians are stored as Indian 10-digit numbers. Add the country code so
-  // Android sends reliably even when the device is roaming.
+  // Guardians are stored as Indian 10-digit numbers. Add country code for reliable delivery.
   return digits.length === 10 ? `+91${digits}` : `+${digits}`;
 };
 
 async function canSendDirectSms() {
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return null;
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'android') return false;
   try {
     const status = await EmergencySms.isAvailable();
-    return status.available;
+    return Boolean(status && status.available);
   } catch {
     return false;
   }
@@ -29,9 +24,6 @@ async function canSendDirectSms() {
 
 /**
  * Open the system SMS composer without returning its Capacitor plugin proxy.
- * Capacitor proxies expose every property (including `then`), so returning one
- * from an async function makes JavaScript treat it as a Promise and attempts
- * to call the nonexistent native `then` method.
  */
 async function openSmsComposer(recipient, message) {
   if (!Capacitor.isNativePlatform()) {
@@ -52,26 +44,30 @@ async function openSmsComposer(recipient, message) {
 /**
  * Build the emergency SMS message body.
  *
- * @param {{ latitude: number, longitude: number, otp: string, mapsUrl: string, status: 'online'|'offline' }} params
+ * @param {{ userName?: string, latitude: number, longitude: number, otp: string, mapsUrl: string, status: 'online'|'offline' }} params
  * @returns {string} formatted SMS body
  */
-export function buildEmergencyMessage({ latitude, longitude, otp, mapsUrl, status = 'offline' }) {
+export function buildEmergencyMessage({ userName, latitude, longitude, otp, mapsUrl, status = 'offline' }) {
   const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
   const locationLabel = status === 'online' ? '📍 Current location' : '📍 Last known location';
   const location = hasCoordinates ? mapsUrl : 'Location unavailable';
   const statusLine = status === 'online'
     ? '📡 Status: Online'
-    : '⚠️ Her device is currently offline. This alert was sent directly via SMS.';
+    : '⚠️ Device is currently offline. This alert was sent directly via SMS.';
   const details = status === 'online'
     ? [`${locationLabel}: ${location}`, `🔐 Verification OTP: ${otp}`, statusLine]
     : [statusLine, `${locationLabel}: ${location}`, `🔐 Verification OTP: ${otp}`];
 
+  const subject = userName
+    ? `${userName} may be in danger and has triggered an SOS.`
+    : 'Your member may be in danger and has triggered an SOS.';
+
   return [
     '🚨 SAFE-ERA SOS ALERT 🚨',
     '',
-    'Your member may be in danger and has triggered an SOS.',
+    subject,
     ...details,
-    'Please contact her immediately and take necessary action.',
+    'Please contact immediately and take necessary action.',
   ].join('\n');
 }
 
@@ -81,7 +77,7 @@ export function buildEmergencyMessage({ latitude, longitude, otp, mapsUrl, statu
  *
  * @param {string} phoneNumber — recipient phone number
  * @param {string} message — the SMS body
- * @returns {{ opened: boolean, method: 'compose'|'unavailable', status?: string, error?: string }}
+ * @returns {{ opened: boolean, sent: boolean, method: 'direct'|'compose'|'unavailable', status?: string, parts?: number, error?: string }}
  */
 export async function sendEmergencySms(phoneNumber, message) {
   const recipient = toSmsRecipient(phoneNumber);
@@ -90,22 +86,24 @@ export async function sendEmergencySms(phoneNumber, message) {
   if (directSmsAvailable) {
     try {
       const result = await EmergencySms.send({ phoneNumber: recipient, message });
-      return { opened: true, sent: true, method: 'direct', parts: result.parts || 1 };
+      return { opened: true, sent: true, method: 'direct', parts: result?.parts || 1 };
     } catch (err) {
-      // Permission can be denied, or an eSIM/tablet may advertise messaging
-      // without being able to send. Let the user still use the system composer.
-      console.warn('[NativeSMS] Direct SMS unavailable, opening composer:', err?.message || err);
+      // Permission can be denied, or carrier error. Fall back to composer.
+      console.warn('[NativeSMS] Direct SMS failed or denied, trying composer:', err?.message || err);
     }
   }
 
   try {
     const result = await openSmsComposer(recipient, message);
-    // Android reports `unknown` after the system composer closes; it cannot
-    // confirm whether the user actually sent the message.
-    return { opened: result.status !== 'canceled', sent: result.status === 'sent', method: 'compose', status: result.status };
+    return {
+      opened: result.status !== 'canceled',
+      sent: result.status === 'sent',
+      method: 'compose',
+      status: result.status
+    };
   } catch (err) {
     console.error('[NativeSMS] Failed to open SMS composer:', err);
-    return { opened: false, method: 'unavailable', error: err.message || 'SMS composer failed' };
+    return { opened: false, sent: false, method: 'unavailable', error: err.message || 'SMS composer failed' };
   }
 }
 

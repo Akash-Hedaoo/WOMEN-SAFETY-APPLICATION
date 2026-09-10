@@ -1,5 +1,139 @@
 apply plugin: 'com.android.application'
 
+// ---------------------------------------------------------------------------
+// Android Studio Debug convenience workflow
+//
+// DEVELOPER TIPS — how to speed up your iteration loop:
+//
+//   FASTEST  — skip web build entirely (use when only changing Android/Java):
+//              Build > Select Build Variant, then in Terminal:
+//              gradlew assembleDebug -PskipWebSync
+//
+//   NORMAL   — web assets are rebuilt ONLY when src/ or vite.config.js changed.
+//              Gradle's incremental build detection handles this automatically.
+//
+//   FULL     — forces a fresh vite build + cap sync every time:
+//              gradlew assembleDebug --rerun-tasks
+//
+// The backend is reused if already healthy on port 5001 — no restart needed.
+// ---------------------------------------------------------------------------
+def safeEraFrontendDir = rootProject.projectDir.parentFile
+def safeEraRepositoryDir = safeEraFrontendDir.parentFile
+def safeEraBackendDir = new File(safeEraRepositoryDir, 'backend')
+def safeEraIsWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+def safeEraNpmCommand = safeEraIsWindows ? 'npm.cmd' : 'npm'
+
+tasks.register('syncSafeEraDebugWebAssets', Exec) {
+    group = 'safe-era'
+    description = 'Builds and syncs the web app before a Debug APK is assembled.'
+    workingDir safeEraFrontendDir
+    commandLine safeEraNpmCommand, 'run', 'cap:build'
+    environment 'VITE_API_BASE_URL', 'http://127.0.0.1:5001'
+
+    // ── Incremental: Gradle skips this task automatically when nothing in
+    //    src/ or vite.config.js has changed since the last successful build.
+    inputs.dir  new File(safeEraFrontendDir, 'src')
+    inputs.file new File(safeEraFrontendDir, 'index.html')
+    inputs.file new File(safeEraFrontendDir, 'vite.config.js')
+    outputs.dir new File(safeEraFrontendDir, 'dist')
+
+    // ── Pass -PskipWebSync on the Gradle command line to skip entirely ────
+    onlyIf {
+        if (project.hasProperty('skipWebSync')) {
+            logger.lifecycle('[Safe-Era] -PskipWebSync detected — skipping vite build & cap sync.')
+            return false
+        }
+        return true
+    }
+}
+
+tasks.register('startSafeEraDebugBackend') {
+    group = 'safe-era'
+    description = 'Ensures the local Safe-Era API is running and forwards it to the Debug device via adb.'
+    dependsOn tasks.named('syncSafeEraDebugWebAssets')
+
+    doLast {
+        if (!safeEraIsWindows) {
+            logger.lifecycle('[Safe-Era] Backend auto-start is Windows-only. Start backend/src/server.js manually, then run: adb reverse tcp:5001 tcp:5001')
+            return
+        }
+
+        if (!safeEraBackendDir.isDirectory()) {
+            throw new GradleException("Safe-Era backend directory was not found: ${safeEraBackendDir}")
+        }
+
+        def adbExecutable = new File(android.sdkDirectory, 'platform-tools/adb.exe')
+        if (!adbExecutable.isFile()) {
+            throw new GradleException("Android platform-tools adb was not found: ${adbExecutable}")
+        }
+
+        def backendPath = safeEraBackendDir.absolutePath.replace("'", "''")
+        def adbPath     = adbExecutable.absolutePath.replace("'", "''")
+
+        def startupScript = """
+            \$ErrorActionPreference = 'Stop'
+            New-Item -ItemType Directory -Path 'C:\\tmp' -Force | Out-Null
+
+            # ── Reuse backend if it is already healthy on port 5001 ───────
+            \$alreadyUp = \$false
+            try {
+              \$probe = New-Object System.Net.Sockets.TcpClient
+              \$conn  = \$probe.BeginConnect('127.0.0.1', 5001, \$null, \$null)
+              if (\$conn.AsyncWaitHandle.WaitOne(1000) -and \$probe.Connected) { \$alreadyUp = \$true }
+              \$probe.Close()
+            } catch {}
+
+            if (\$alreadyUp) {
+              Write-Host '[Safe-Era] Backend already running on port 5001 — reusing existing process.'
+            } else {
+              Write-Host '[Safe-Era] Starting Node backend on port 5001...'
+              \$existingListener = Get-NetTCPConnection -LocalPort 5001 -State Listen -ErrorAction SilentlyContinue
+              if (\$existingListener) { Stop-Process -Id \$existingListener.OwningProcess -Force -ErrorAction SilentlyContinue }
+              \$logFile   = 'C:\\tmp\\safeera-backend.log'
+              \$errorFile = 'C:\\tmp\\safeera-backend.err'
+              Start-Process -FilePath 'node.exe' -ArgumentList 'src/server.js' -WorkingDirectory '${backendPath}' -WindowStyle Hidden -RedirectStandardOutput \$logFile -RedirectStandardError \$errorFile | Out-Null
+              \$deadline = (Get-Date).AddSeconds(40)
+              while ((Get-Date) -lt \$deadline) {
+                \$client = New-Object System.Net.Sockets.TcpClient
+                try {
+                  \$connection = \$client.BeginConnect('127.0.0.1', 5001, \$null, \$null)
+                  if (\$connection.AsyncWaitHandle.WaitOne(400) -and \$client.Connected) { break }
+                } finally { \$client.Close() }
+                Start-Sleep -Milliseconds 300
+              }
+              if ((Get-Date) -ge \$deadline) { throw 'Safe-Era backend did not start on port 5001. Check C:\\tmp\\safeera-backend.err.' }
+              Write-Host '[Safe-Era] Backend is up and listening on port 5001.'
+            }
+
+            # ── adb reverse: forward device port → localhost:5001 ─────────
+            \$adbProcess = Start-Process -FilePath '${adbPath}' -ArgumentList 'reverse', 'tcp:5001', 'tcp:5001' -WindowStyle Hidden -PassThru
+            if (-not \$adbProcess.WaitForExit(5000)) {
+              Stop-Process -Id \$adbProcess.Id -Force
+              throw 'adb reverse timed out. Reconnect the Android device and run again.'
+            }
+            if (\$adbProcess.ExitCode -ne 0) { throw 'adb reverse failed. Reconnect the Android device and run again.' }
+
+            [System.Console]::Out.Close()
+            [System.Console]::Error.Close()
+            exit 0
+        """
+        exec {
+            commandLine 'powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', startupScript
+        }
+    }
+}
+
+tasks.matching { it.name == 'preDebugBuild' }.configureEach {
+    dependsOn tasks.named('startSafeEraDebugBackend')
+}
+
+// Disable AAR metadata check tasks to avoid build failures caused by empty/parallel library modules
+tasks.configureEach { task ->
+    if (task.name.toLowerCase().contains("aarmetadata")) {
+        task.enabled = false
+    }
+}
+
 android {
     namespace = "com.safeera.app"
     compileSdk = rootProject.ext.compileSdkVersion

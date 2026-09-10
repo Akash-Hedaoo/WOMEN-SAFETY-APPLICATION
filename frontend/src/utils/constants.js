@@ -28,7 +28,11 @@ export const ROUTES = {
 };
 
 export const APP_NAME = 'Safe-Era';
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://10.0.2.2:5001';
+// Android Studio's Debug task creates `adb reverse tcp:5001 tcp:5001`, so the
+// same loopback address reaches the local backend from either a USB phone or
+// an Android emulator. A deployed build must set VITE_API_BASE_URL to its HTTPS
+// server before it is packaged.
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5001';
 
 export const MOCK_USER = {
     name: 'Anushka Prasad',

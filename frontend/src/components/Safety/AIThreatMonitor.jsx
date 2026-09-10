@@ -1,15 +1,42 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Shield, Activity, Mic, MapPin, AlertCircle, CheckCircle, RefreshCw, Zap, ShieldAlert } from 'lucide-react';
+import { API_BASE_URL } from '../../utils/constants';
+
+const clampScore = (score) => Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
+
+// AI never lowers a local signal. A failed or slow online service therefore
+// cannot make an active local emergency signal less safe.
+const fuseSafetyScores = (localScore, aiScore) => {
+  const local = clampScore(localScore);
+  if (!Number.isFinite(aiScore)) return local;
+  return Math.max(local, clampScore((local * 0.65) + (aiScore * 0.35)));
+};
+
+const getAuthToken = () => (
+  localStorage.getItem('authToken') || localStorage.getItem('token') || localStorage.getItem('accessToken')
+);
+
+const blobToBase64 = (blob) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onerror = () => reject(new Error('Could not read the audio safety clip.'));
+  reader.onloadend = () => resolve(String(reader.result || '').split(',').pop());
+  reader.readAsDataURL(blob);
+});
 
 export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
   const [isEnabled, setIsEnabled] = useState(false);
-  const [motionScore, setMotionScore] = useState(12);
-  const [audioScore, setAudioScore] = useState(8);
+  const [localMotionScore, setLocalMotionScore] = useState(12);
+  const [localAudioScore, setLocalAudioScore] = useState(8);
+  const [movementAiScore, setMovementAiScore] = useState(null);
+  const [voiceAiScore, setVoiceAiScore] = useState(null);
+  const [movementActivity, setMovementActivity] = useState('Not checked');
+  const [voiceAiStatus, setVoiceAiStatus] = useState('Local only');
+  const [movementAiStatus, setMovementAiStatus] = useState('Local only');
   const [gpsScore, setGpsScore] = useState(15);
   
   // Sensor & Permission states (Fix #4)
-  const [micPermission, setMicPermission] = useState('prompt'); // 'prompt' | 'granted' | 'denied' | 'unsupported'
-  const [motionPermission, setMotionPermission] = useState('prompt');
+  const [, setMicPermission] = useState('prompt'); // 'prompt' | 'granted' | 'denied' | 'unsupported'
+  const [, setMotionPermission] = useState('prompt');
   const [permissionError, setPermissionError] = useState(null);
 
   // Soft check-in popup state (Medium threshold 40-74)
@@ -21,7 +48,21 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
 
   const audioContextRef = useRef(null);
   const micStreamRef = useRef(null);
+  const audioAnalyserRef = useRef(null);
   const rafIdRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordingTimerRef = useRef(null);
+  const monitoringRef = useRef(false);
+  const localMotionRef = useRef(12);
+  const localAudioRef = useRef(8);
+  const motionSamplesRef = useRef([]);
+  const lastVoiceAnalysisRef = useRef(0);
+  const lastMovementAnalysisRef = useRef(0);
+  const voiceAnalysisInFlightRef = useRef(false);
+  const movementAnalysisInFlightRef = useRef(false);
+
+  const motionScore = fuseSafetyScores(localMotionScore, movementAiScore);
+  const audioScore = fuseSafetyScores(localAudioScore, voiceAiScore);
 
   // Calculate overall weighted score (0 - 100)
   const overallThreatScore = Math.min(
@@ -31,6 +72,101 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
 
   // Determine threat stage
   const threatLevel = overallThreatScore >= 75 ? 'HIGH' : overallThreatScore >= 40 ? 'MEDIUM' : 'LOW';
+
+  const updateLocalMotionScore = (nextScore) => {
+    const score = clampScore(nextScore);
+    localMotionRef.current = score;
+    setLocalMotionScore(score);
+    return score;
+  };
+
+  const updateLocalAudioScore = (nextScore) => {
+    const score = clampScore(nextScore);
+    localAudioRef.current = score;
+    setLocalAudioScore(score);
+    return score;
+  };
+
+  const requestOnlineVoiceAnalysis = useCallback(async () => {
+    if (!navigator.onLine || voiceAnalysisInFlightRef.current || !micStreamRef.current || !window.MediaRecorder) return;
+    if (Date.now() - lastVoiceAnalysisRef.current < 15_000) return;
+
+    try {
+      voiceAnalysisInFlightRef.current = true;
+      lastVoiceAnalysisRef.current = Date.now();
+      setVoiceAiStatus('Checking online AI…');
+      const preferredType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+        .find((type) => MediaRecorder.isTypeSupported?.(type));
+      const recorder = preferredType
+        ? new MediaRecorder(micStreamRef.current, { mimeType: preferredType })
+        : new MediaRecorder(micStreamRef.current);
+      const chunks = [];
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data?.size) chunks.push(event.data);
+      };
+      recorder.onerror = () => {
+        setVoiceAiStatus('Online AI unavailable — local monitoring active');
+      };
+      recorder.onstop = async () => {
+        try {
+          const clip = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+          if (!clip.size) throw new Error('Audio clip was empty.');
+          const token = getAuthToken();
+          const response = await fetch(`${API_BASE_URL}/api/threat-analysis/voice`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ audioBase64: await blobToBase64(clip), mimeType: clip.type })
+          });
+          const data = await response.json();
+          if (!response.ok || !data.success) throw new Error(data.message || 'Online voice AI is unavailable.');
+          setVoiceAiScore(clampScore(data.aiDistressScore));
+          setVoiceAiStatus(data.transcript ? `AI checked: “${data.transcript.slice(0, 72)}”` : 'AI checked: no speech detected');
+        } catch {
+          setVoiceAiStatus('Online AI unavailable — local monitoring active');
+        } finally {
+          voiceAnalysisInFlightRef.current = false;
+          mediaRecorderRef.current = null;
+        }
+      };
+      recorder.start();
+      recordingTimerRef.current = setTimeout(() => {
+        if (recorder.state !== 'inactive') recorder.stop();
+      }, 4_000);
+    } catch {
+      voiceAnalysisInFlightRef.current = false;
+      setVoiceAiStatus('Online AI unavailable — local monitoring active');
+    }
+  }, []);
+
+  const requestOnlineMovementAnalysis = useCallback(async () => {
+    if (!navigator.onLine || movementAnalysisInFlightRef.current) return;
+    if (Date.now() - lastMovementAnalysisRef.current < 15_000) return;
+    const samples = motionSamplesRef.current.slice(-300);
+    if (samples.length < 20) return;
+
+    try {
+      movementAnalysisInFlightRef.current = true;
+      lastMovementAnalysisRef.current = Date.now();
+      setMovementAiStatus('Checking online HAR…');
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/api/threat-analysis/movement`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ samples })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Online movement AI is unavailable.');
+      setMovementAiScore(clampScore(data.aiMovementScore));
+      setMovementActivity(`${data.activity || 'unknown'} (${Math.round((data.confidence || 0) * 100)}%)`);
+      setMovementAiStatus(data.abnormal ? 'AI flagged abnormal movement' : 'AI checked normal movement');
+    } catch {
+      setMovementAiStatus('Online HAR unavailable — local monitoring active');
+    } finally {
+      movementAnalysisInFlightRef.current = false;
+    }
+  }, []);
 
   // Sensor Permission Request Handler (Fix #4)
   const requestSensorsPermission = async () => {
@@ -50,25 +186,38 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
           audioContextRef.current = ctx;
           const source = ctx.createMediaStreamSource(stream);
           const analyser = ctx.createAnalyser();
-          analyser.fftSize = 256;
+          analyser.fftSize = 1024;
           source.connect(analyser);
+          audioAnalyserRef.current = analyser;
 
           const bufferLength = analyser.frequencyBinCount;
           const dataArray = new Uint8Array(bufferLength);
 
           const updateVolume = () => {
-            if (!isEnabled) return;
+            if (!monitoringRef.current) return;
             analyser.getByteFrequencyData(dataArray);
             let sum = 0;
             for (let i = 0; i < bufferLength; i++) {
               sum += dataArray[i];
             }
             const average = sum / bufferLength;
-            // Map average (0-128) to audio score
-            const calculatedAudio = Math.min(100, Math.round((average / 128) * 100));
-            setAudioScore((prev) => Math.max(calculatedAudio, Math.max(5, prev - 2)));
+            // A scream usually has both amplitude and energy in the human
+            // voice band. This stays fully local and needs no network.
+            const binHz = ctx.sampleRate / analyser.fftSize;
+            const startBin = Math.max(0, Math.floor(900 / binHz));
+            const endBin = Math.min(bufferLength, Math.ceil(4_000 / binHz));
+            let voiceBandSum = 0;
+            for (let i = startBin; i < endBin; i++) voiceBandSum += dataArray[i];
+            const voiceBandAverage = voiceBandSum / Math.max(1, endBin - startBin);
+            const volumeScore = (average / 128) * 100;
+            const voiceBandScore = (voiceBandAverage / 128) * 100;
+            const calculatedAudio = clampScore((volumeScore * 0.42) + (voiceBandScore * 0.58));
+            const nextAudio = Math.max(calculatedAudio, Math.max(5, localAudioRef.current - 2));
+            updateLocalAudioScore(nextAudio);
+            if (nextAudio >= 35) requestOnlineVoiceAnalysis();
             rafIdRef.current = requestAnimationFrame(updateVolume);
           };
+          monitoringRef.current = true;
           updateVolume();
         }
       } else {
@@ -90,10 +239,11 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
       } else {
         setMotionPermission('unsupported');
       }
-    } catch (err) {
+    } catch {
       setMotionPermission('denied');
     }
 
+    monitoringRef.current = true;
     setIsEnabled(true);
 
     // Cleanup RAF on disable
@@ -105,19 +255,21 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
     };
   };
 
-  // Cancel RAF loop when monitoring is disabled or on unmount
+  // Release microphone resources when the monitor unmounts. Toggling Safety
+  // Mode pauses sensor handling without invalidating an already granted permission.
   useEffect(() => {
-    if (!isEnabled && rafIdRef.current) {
-      cancelAnimationFrame(rafIdRef.current);
-      rafIdRef.current = null;
-    }
     return () => {
+      monitoringRef.current = false;
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
+      if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+      if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
+      audioContextRef.current?.close?.().catch(() => {});
+      micStreamRef.current?.getTracks?.().forEach((track) => track.stop());
     };
-  }, [isEnabled]);
+  }, []);
 
   // Device Motion Listener
   useEffect(() => {
@@ -137,19 +289,29 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
       lastY = acc.y || 0;
       lastZ = acc.z || 0;
 
+      const now = Date.now();
+      const rotation = event.rotationRate || {};
+      motionSamplesRef.current.push({
+        timestamp: now,
+        ax: Number(acc.x || 0), ay: Number(acc.y || 0), az: Number(acc.z || 0),
+        gx: Number(rotation.alpha || 0), gy: Number(rotation.beta || 0), gz: Number(rotation.gamma || 0)
+      });
+      motionSamplesRef.current = motionSamplesRef.current.filter((sample) => now - sample.timestamp <= 10_000);
+
       // Spike detection logic: sudden movement > 15 m/s²
       if (totalDelta > 18) {
         const spike = Math.min(100, Math.round(totalDelta * 3));
-        setMotionScore(spike);
+        const nextMotion = updateLocalMotionScore(spike);
+        if (nextMotion >= 35) requestOnlineMovementAnalysis();
       } else {
         // Slowly decay back to baseline walking score (10-15)
-        setMotionScore((prev) => Math.max(10, Math.round(prev * 0.95)));
+        updateLocalMotionScore(Math.max(10, Math.round(localMotionRef.current * 0.95)));
       }
     };
 
     window.addEventListener('devicemotion', handleMotion);
     return () => window.removeEventListener('devicemotion', handleMotion);
-  }, [isEnabled]);
+  }, [isEnabled, requestOnlineMovementAnalysis]);
 
   // Check-in Modal Countdown Timer (Medium Threat)
   useEffect(() => {
@@ -160,15 +322,13 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
           if (prev <= 1) {
             // Expiration of check-in increases threat score further into High
             setShowCheckInModal(false);
-            setMotionScore((m) => Math.min(100, m + 35));
-            setAudioScore((a) => Math.min(100, a + 35));
+            updateLocalMotionScore(Math.min(100, localMotionRef.current + 35));
+            updateLocalAudioScore(Math.min(100, localAudioRef.current + 35));
             return 15;
           }
           return prev - 1;
         });
       }, 1000);
-    } else {
-      setCheckInCountdown(15);
     }
     return () => clearInterval(timer);
   }, [showCheckInModal]);
@@ -184,7 +344,8 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
 
     // Medium Score Check-in Trigger (40 - 74)
     if (overallThreatScore >= 40 && overallThreatScore < 75 && !showCheckInModal && !activeIncident) {
-      setShowCheckInModal(true);
+      const openCheckInTimer = setTimeout(() => setShowCheckInModal(true), 0);
+      return () => clearTimeout(openCheckInTimer);
     }
 
     // High Score Auto-Escalation (75+)
@@ -198,33 +359,63 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
           triggerSource: 'threat_detection',
           threatScore: overallThreatScore,
           threatDetails: {
+            localMotionScore,
+            movementAiScore,
             motionScore,
+            localAudioScore,
+            voiceAiScore,
             audioScore,
             gpsScore
           }
         });
       }
     }
-  }, [overallThreatScore, isEnabled, activeIncident, showCheckInModal, onTriggerAutoSOS, motionScore, audioScore, gpsScore]);
+  }, [overallThreatScore, isEnabled, activeIncident, showCheckInModal, onTriggerAutoSOS, localMotionScore, movementAiScore, motionScore, localAudioScore, voiceAiScore, audioScore, gpsScore]);
 
   const handleDismissCheckIn = () => {
     setShowCheckInModal(false);
+    setCheckInCountdown(15);
     // Lower scores after "I'm fine" tap
-    setMotionScore(10);
-    setAudioScore(8);
+    updateLocalMotionScore(10);
+    updateLocalAudioScore(8);
+    setMovementAiScore(null);
+    setVoiceAiScore(null);
+    setMovementActivity('Not checked');
+    setVoiceAiStatus('Local only');
+    setMovementAiStatus('Local only');
     setGpsScore(12);
   };
 
   // Simulation handlers for demonstration
-  const simulateJolt = () => setMotionScore(88);
-  const simulateScream = () => setAudioScore(85);
+  const simulateJolt = () => updateLocalMotionScore(88);
+  const simulateScream = () => updateLocalAudioScore(85);
   const simulateGpsDev = () => setGpsScore(90);
   const resetBaseline = () => {
-    setMotionScore(12);
-    setAudioScore(8);
+    updateLocalMotionScore(12);
+    updateLocalAudioScore(8);
+    setMovementAiScore(null);
+    setVoiceAiScore(null);
+    setMovementActivity('Not checked');
+    setVoiceAiStatus('Local only');
+    setMovementAiStatus('Local only');
     setGpsScore(14);
     setShowCheckInModal(false);
+    setCheckInCountdown(15);
     hasTriggeredForCurrentIncident.current = false;
+  };
+
+  const stopMonitoring = () => {
+    monitoringRef.current = false;
+    setIsEnabled(false);
+    if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+    if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+    if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current.stop();
+    audioContextRef.current?.close?.().catch(() => {});
+    micStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+    audioContextRef.current = null;
+    micStreamRef.current = null;
+    audioAnalyserRef.current = null;
+    mediaRecorderRef.current = null;
   };
 
   return (
@@ -243,13 +434,13 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
               </span>
             </div>
             <p className="text-xs text-[#687067] mt-0.5">
-              Silent background safety engine watching Motion, Audio & GPS signals.
+              Local motion and voice detection works offline. Online AI only checks a short clip or sensor window after a local warning signal.
             </p>
           </div>
         </div>
 
         <button
-          onClick={isEnabled ? () => setIsEnabled(false) : requestSensorsPermission}
+          onClick={isEnabled ? stopMonitoring : requestSensorsPermission}
           className={`px-5 py-2.5 rounded-2xl text-xs font-semibold uppercase tracking-wider transition-all shadow-sm ${
             isEnabled
               ? 'bg-[#4F7D55]/15 text-[#4F7D55] border border-[#4F7D55]/30 hover:bg-[#4F7D55]/25'
@@ -330,7 +521,7 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-semibold">
               <span className="inline-flex items-center gap-2 text-[#28302A]">
-                <Zap className="h-3.5 w-3.5 text-[#7A8E72]" /> Motion Accelerometer
+                <Zap className="h-3.5 w-3.5 text-[#7A8E72]" /> Motion · local {localMotionScore}% / AI {movementAiScore ?? '—'}%
               </span>
               <span className="font-mono text-[#687067]">{motionScore}%</span>
             </div>
@@ -340,13 +531,14 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
                 style={{ width: `${motionScore}%` }}
               />
             </div>
+            <p className="text-[10px] text-[#687067]">{movementAiStatus} · {movementActivity}</p>
           </div>
 
           {/* Signal 2: Audio */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-semibold">
               <span className="inline-flex items-center gap-2 text-[#28302A]">
-                <Mic className="h-3.5 w-3.5 text-[#A8B8A0]" /> Audio Distress dB
+                <Mic className="h-3.5 w-3.5 text-[#A8B8A0]" /> Voice · local {localAudioScore}% / AI {voiceAiScore ?? '—'}%
               </span>
               <span className="font-mono text-[#687067]">{audioScore}%</span>
             </div>
@@ -356,6 +548,7 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
                 style={{ width: `${audioScore}%` }}
               />
             </div>
+            <p className="text-[10px] text-[#687067]">{voiceAiStatus}</p>
           </div>
 
           {/* Signal 3: GPS */}

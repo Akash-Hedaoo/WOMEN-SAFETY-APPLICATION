@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Shield } from 'lucide-react';
 import { ROUTES, API_BASE_URL } from '../utils/constants';
+import { fetchWithBackendRetry, localBackendUnavailableMessage } from '../services/backendConnection';
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,7 +21,7 @@ export default function Login() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      const response = await fetchWithBackendRetry(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password }),
@@ -45,7 +46,7 @@ export default function Login() {
     } catch (err) {
       setError(err.name === 'AbortError'
         ? 'Server is waking up. Please wait a moment and try again.'
-        : 'Cannot connect to server. Please try again in a moment.');
+        : localBackendUnavailableMessage);
     } finally {
       setIsLoading(false);
     }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Eye, EyeOff, Lock, Mail, Radio, Shield } from 'lucide-react';
 import { API_BASE_URL, ROUTES } from '../utils/constants';
+import { fetchWithBackendRetry, localBackendUnavailableMessage } from '../services/backendConnection';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
@@ -17,7 +18,7 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/admin/login`, {
+      const response = await fetchWithBackendRetry(`${API_BASE_URL}/api/auth/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password })
@@ -34,7 +35,7 @@ export default function AdminLogin() {
       localStorage.setItem('user', JSON.stringify(data.user));
       navigate(ROUTES.ADMIN, { replace: true });
     } catch (requestError) {
-      setError(requestError.message || 'Cannot connect to the server.');
+      setError(requestError?.name === 'TypeError' ? localBackendUnavailableMessage : (requestError?.message || localBackendUnavailableMessage));
     } finally {
       setIsLoading(false);
     }

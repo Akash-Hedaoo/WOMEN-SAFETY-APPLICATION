@@ -8,5 +8,6 @@ router.use('/location', require('./locationRoutes'));
 router.use('/subscription', require('./subscriptionRoutes'));
 router.use('/news', require('./newsRoutes'));
 router.use('/complaints', require('./complaintRoutes'));
+router.use('/threat-analysis', require('./threatAnalysisRoutes'));
 
 module.exports = router;
