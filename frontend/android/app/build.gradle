@@ -135,6 +135,14 @@ tasks.configureEach { task ->
 }
 
 android {
+    signingConfigs {
+        release {
+            storeFile file('my-release-key.jks')
+            storePassword 'password123'
+            keyAlias 'release-key'
+            keyPassword 'password123'
+        }
+    }
     namespace = "com.safeera.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
@@ -152,6 +160,7 @@ android {
     }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
