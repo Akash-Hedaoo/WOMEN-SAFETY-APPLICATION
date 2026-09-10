@@ -3,8 +3,6 @@ const router = express.Router();
 const { 
   getGuardians, 
   addGuardian, 
-  verifyGuardian,
-  resendOTP,
   updateGuardian,
   removeGuardian,
   sendTestAlert
@@ -15,8 +13,6 @@ router.use(protect);
 
 router.get('/', getGuardians);
 router.post('/', addGuardian);
-router.post('/verify', verifyGuardian);
-router.post('/resend-otp', resendOTP);
 router.put('/:id', updateGuardian);
 router.delete('/:id', removeGuardian);
 router.post('/:id/test-alert', sendTestAlert);

@@ -13,6 +13,7 @@ const connectDB = require('./config/db.js');
 const initSocket = require('./config/socket.js');
 const allRoutes = require('./routes/index.js');
 const errorMiddleware = require('./middleware/errorMiddleware.js');
+const { refreshNewsFeed } = require('./controllers/newsController.js');
   
 // Connect to DB
 connectDB();
@@ -151,6 +152,12 @@ httpServer.listen(PORT, () => {
   console.log(`[SERVER] Server: http://localhost:${PORT}`);
   console.log(`[ENV] Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`[DB] MongoDB: Connected\n`);
+
+  refreshNewsFeed().catch((error) => console.warn(`[NEWS] Initial refresh failed: ${error.message}`));
+  const newsRefreshTimer = setInterval(() => {
+    refreshNewsFeed().catch((error) => console.warn(`[NEWS] Scheduled refresh failed: ${error.message}`));
+  }, 10 * 60 * 1000);
+  newsRefreshTimer.unref();
 });
 
 // Graceful shutdown

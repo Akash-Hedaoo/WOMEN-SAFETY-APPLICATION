@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
-  AlertCircle, CheckCircle2, Clock, Edit3, Loader2,
+  AlertCircle, CheckCircle2, Edit3, Loader2,
   Plus, RefreshCw, Send, Shield, ShieldCheck, Trash2, UserPlus, X,
 } from 'lucide-react';
 import { API_BASE_URL } from '../utils/constants';
@@ -32,6 +33,10 @@ const apiFetch = async (path, options = {}) => {
     },
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && data.code === 'TOKEN_EXPIRED') {
+    ['authToken', 'token', 'accessToken', 'refreshToken', 'user'].forEach((key) => localStorage.removeItem(key));
+    throw new Error('SESSION_EXPIRED');
+  }
   if (!res.ok) throw new Error(data.message || 'Request failed');
   return data;
 };
@@ -64,94 +69,12 @@ function Toast({ toast, onClose }) {
   );
 }
 
-// ─── OTP Verify Modal ────────────────────────────────────────────────────────
-
-function OTPModal({ guardian, onClose, onVerified, showToast }) {
-  const [otp, setOtp] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [resending, setResending] = useState(false);
-
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    if (otp.length !== 6) return;
-    setLoading(true);
-    try {
-      await apiFetch('/verify', {
-        method: 'POST',
-        body: JSON.stringify({ guardianId: guardian._id, otp }),
-      });
-      showToast({ message: `${guardian.guardianName} verified successfully!` });
-      onVerified();
-    } catch (err) {
-      showToast({ type: 'error', message: err.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResend = async () => {
-    setResending(true);
-    try {
-      await apiFetch('/resend-otp', {
-        method: 'POST',
-        body: JSON.stringify({ guardianId: guardian._id }),
-      });
-      showToast({ message: "New OTP sent to guardian's phone" });
-    } catch (err) {
-      showToast({ type: 'error', message: err.message });
-    } finally {
-      setResending(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-      <div className="premium-panel-strong w-full max-w-md p-6 bg-white border border-[#DCDDD5] shadow-2xl">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-headline text-2xl font-semibold text-[#28302A]">Verify Guardian</h3>
-          <button onClick={onClose} className="text-[#687067] hover:text-[#28302A]"><X className="h-5 w-5" /></button>
-        </div>
-        <p className="text-sm text-[#687067] mb-6">
-          An OTP was sent to <span className="text-[#7A8E72] font-semibold">{guardian.guardianName}</span>&#39;s number
-          ending in <span className="text-[#28302A] font-mono font-bold">{guardian.guardianPhone?.slice(-4)}</span>.
-          Ask them to share it with you.
-        </p>
-        <form onSubmit={handleVerify} className="space-y-4">
-          <input
-            className="premium-input text-center tracking-[0.5em] text-2xl font-mono"
-            placeholder="000000"
-            maxLength={6}
-            value={otp}
-            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-          />
-          <button
-            type="submit"
-            disabled={otp.length !== 6 || loading}
-            className="btn-primary w-full justify-center disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-            {loading ? 'Verifying…' : 'Verify OTP'}
-          </button>
-          <button
-            type="button"
-            onClick={handleResend}
-            disabled={resending}
-            className="w-full text-sm text-[#687067] hover:text-[#28302A] flex items-center justify-center gap-2"
-          >
-            {resending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-            Resend OTP
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 // ─── Edit Modal ──────────────────────────────────────────────────────────────
 
 function EditModal({ guardian, onClose, onSaved, showToast }) {
   const [form, setForm] = useState({
     guardianName: guardian.guardianName,
+    guardianEmail: guardian.guardianEmail || '',
     relation: guardian.relation,
     notes: guardian.notes || '',
   });
@@ -196,6 +119,10 @@ function EditModal({ guardian, onClose, onSaved, showToast }) {
             <input className="premium-input opacity-60 cursor-not-allowed bg-[#FAF8F5]" value={guardian.guardianPhone} readOnly />
           </div>
           <div>
+            <label className="text-xs text-[#687067] mb-1 block">Email address</label>
+            <input className="premium-input" type="email" value={form.guardianEmail} onChange={(e) => setForm({ ...form, guardianEmail: e.target.value })} required />
+          </div>
+          <div>
             <label className="text-xs text-[#687067] mb-1 block">Relationship</label>
             <select
               className="premium-select"
@@ -231,7 +158,7 @@ function EditModal({ guardian, onClose, onSaved, showToast }) {
 
 // ─── Guardian Card ───────────────────────────────────────────────────────────
 
-function GuardianCard({ guardian, onEdit, onRemove, onVerify, showToast }) {
+function GuardianCard({ guardian, onEdit, onRemove, showToast }) {
   const [testing, setTesting] = useState(false);
   const [removing, setRemoving] = useState(false);
 
@@ -266,43 +193,23 @@ function GuardianCard({ guardian, onEdit, onRemove, onVerify, showToast }) {
         <div className="flex items-center gap-4">
           <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FAF0EA] text-[#7A8E72] border border-[#DCDDD5] font-semibold text-lg flex-shrink-0">
             {guardian.guardianName.charAt(0).toUpperCase()}
-            {guardian.isVerified && (
-              <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#4F7D55] ring-2 ring-white">
-                <ShieldCheck className="h-3 w-3 text-white" />
-              </span>
-            )}
+            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#4F7D55] ring-2 ring-white"><ShieldCheck className="h-3 w-3 text-white" /></span>
           </div>
           <div>
             <p className="font-semibold text-[#28302A]">{guardian.guardianName}</p>
             <p className="text-sm text-[#687067]">
               +91 {guardian.guardianPhone} · {guardian.relation}
             </p>
+            <p className="text-sm text-[#687067]">{guardian.guardianEmail}</p>
             <div className="flex items-center gap-2 mt-1">
-              {guardian.isVerified ? (
-                <span className="inline-flex items-center gap-1 text-xs text-[#4F7D55] font-medium">
-                  <ShieldCheck className="h-3 w-3" /> Verified
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-xs text-[#C18A32] font-medium">
-                  <Clock className="h-3 w-3" /> Pending verification
-                </span>
-              )}
+              <span className="inline-flex items-center gap-1 text-xs text-[#4F7D55] font-medium"><ShieldCheck className="h-3 w-3" /> Active guardian</span>
               <span className="text-xs text-[#B8A99A]">· Last alert: {formatLastAlert(guardian.lastAlertedAt)}</span>
             </div>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {!guardian.isVerified && (
-            <button
-              onClick={() => onVerify(guardian)}
-              className="text-sm font-semibold text-[#7A8E72] hover:text-[#5e6e58] border border-[#7A8E72]/40 bg-[#FAF0EA] rounded-xl px-3 py-1.5 hover:bg-[#f3e5dc] transition-colors"
-            >
-              Enter OTP
-            </button>
-          )}
-          {guardian.isVerified && (
-            <button
+          <button
               onClick={handleTestAlert}
               disabled={testing}
               className="text-sm font-semibold text-[#687067] hover:text-[#28302A] border border-[#DCDDD5] rounded-xl px-3 py-1.5 hover:bg-[#FAF8F5] transition-colors disabled:opacity-50 flex items-center gap-1"
@@ -310,7 +217,6 @@ function GuardianCard({ guardian, onEdit, onRemove, onVerify, showToast }) {
               {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3 text-[#7A8E72]" />}
               Test alert
             </button>
-          )}
           <button
             onClick={() => onEdit(guardian)}
             className="rounded-2xl border border-[#DCDDD5] bg-white p-2.5 text-[#687067] hover:text-[#28302A] hover:bg-[#FAF8F5] transition-colors shadow-sm"
@@ -338,15 +244,15 @@ const RELATIONSHIPS = ['Father', 'Mother', 'Brother', 'Sister', 'Friend', 'Partn
 const MAX_GUARDIANS = 5;
 
 export default function GuardianNetworkPage() {
+  const navigate = useNavigate();
   const [guardians, setGuardians] = useState([]);
   const [loadingGuardians, setLoadingGuardians] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
-  const [formData, setFormData] = useState({ guardianName: '', guardianPhone: '', relation: 'Friend' });
+  const [formData, setFormData] = useState({ guardianName: '', guardianPhone: '', guardianEmail: '', relation: 'Friend' });
   const [addLoading, setAddLoading] = useState(false);
 
   const [editingGuardian, setEditingGuardian] = useState(null);
-  const [verifyingGuardian, setVerifyingGuardian] = useState(null);
   const [toast, setToast] = useState(null);
 
   const showToast = useCallback((t) => {
@@ -360,14 +266,17 @@ export default function GuardianNetworkPage() {
     setLoadError(null);
     try {
       const data = await apiFetch('/');
-      // Backend returns { verified: [...], pending: [...] }
-      setGuardians([...(data.verified || []), ...(data.pending || [])]);
+      setGuardians(data.guardians || []);
     } catch (err) {
+      if (err.message === 'SESSION_EXPIRED') {
+        navigate('/login', { replace: true, state: { message: 'Your session expired. Please sign in again.' } });
+        return;
+      }
       setLoadError(err.message);
     } finally {
       setLoadingGuardians(false);
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => { fetchGuardians(); }, [fetchGuardians]);
 
@@ -376,7 +285,6 @@ export default function GuardianNetworkPage() {
     const handleEsc = (e) => {
       if (e.key === 'Escape') {
         setEditingGuardian(null);
-        setVerifyingGuardian(null);
       }
     };
     window.addEventListener('keydown', handleEsc);
@@ -385,7 +293,7 @@ export default function GuardianNetworkPage() {
 
   const handleAdd = async (e) => {
     e.preventDefault();
-    if (!formData.guardianName || !formData.guardianPhone) return;
+    if (!formData.guardianName || !formData.guardianPhone || !formData.guardianEmail) return;
 
     // Validate 10-digit Indian phone
     const phoneClean = normalizeIndianMobile(formData.guardianPhone);
@@ -400,8 +308,8 @@ export default function GuardianNetworkPage() {
         method: 'POST',
         body: JSON.stringify({ ...formData, guardianPhone: phoneClean }),
       });
-      showToast({ message: data.message || 'Guardian added! OTP sent to their number.' });
-      setFormData({ guardianName: '', guardianPhone: '', relation: 'Friend' });
+      showToast({ message: data.message || 'Guardian added and activated.' });
+      setFormData({ guardianName: '', guardianPhone: '', guardianEmail: '', relation: 'Friend' });
       await Promise.all([fetchGuardians(), syncGuardians()]);
     } catch (err) {
       showToast({ type: 'error', message: err.message });
@@ -419,15 +327,6 @@ export default function GuardianNetworkPage() {
   return (
     <div className="page-shell mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
       <Toast toast={toast} onClose={() => setToast(null)} />
-
-      {verifyingGuardian && (
-        <OTPModal
-          guardian={verifyingGuardian}
-          onClose={() => setVerifyingGuardian(null)}
-          onVerified={() => { setVerifyingGuardian(null); fetchGuardians(); }}
-          showToast={showToast}
-        />
-      )}
 
       {editingGuardian && (
         <EditModal
@@ -494,6 +393,17 @@ export default function GuardianNetworkPage() {
                 />
               </div>
               <div>
+                <label className="text-xs text-[#687067] mb-1 block">Email address</label>
+                <input
+                  className="premium-input"
+                  type="email"
+                  placeholder="guardian@example.com"
+                  value={formData.guardianEmail}
+                  onChange={(e) => setFormData({ ...formData, guardianEmail: e.target.value })}
+                  required
+                />
+              </div>
+              <div>
                 <label className="text-xs text-[#687067] mb-1 block">Relationship</label>
                 <select
                   className="premium-select"
@@ -519,9 +429,8 @@ export default function GuardianNetworkPage() {
           <div className="mt-6 rounded-2xl border border-[#A8B8A0]/30 bg-[#A8B8A0]/10 p-4 text-xs text-[#28302A] space-y-1">
             <p className="font-semibold text-[#28302A] flex items-center gap-1"><Shield className="h-3 w-3 text-[#7A8E72]" /> How it works</p>
             <p>1. Add guardian&#39;s phone number</p>
-            <p>2. An OTP is sent to their phone via SMS</p>
-            <p>3. They share the OTP with you to verify</p>
-            <p>4. Verified guardians receive SOS alerts</p>
+            <p>2. Add their email address</p>
+            <p>3. They are active immediately and receive SOS alerts by SMS and email</p>
           </div>
         </div>
 
@@ -546,49 +455,11 @@ export default function GuardianNetworkPage() {
               <p className="text-sm text-center">Add your first trusted contact using the form on the left.</p>
             </div>
           ) : (
-            <>
-              {/* Verified section */}
-              {guardians.filter(g => g.isVerified).length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-[#4F7D55] mb-3 flex items-center gap-2">
-                    <ShieldCheck className="h-3 w-3" /> Verified ({guardians.filter(g => g.isVerified).length})
-                  </p>
-                  <div className="space-y-3">
-                    {guardians.filter(g => g.isVerified).map((g) => (
-                      <GuardianCard
-                        key={g._id}
-                        guardian={g}
-                        onEdit={setEditingGuardian}
-                        onRemove={handleRemoveFromList}
-                        onVerify={setVerifyingGuardian}
-                        showToast={showToast}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Pending section */}
-              {guardians.filter(g => !g.isVerified).length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-[#C18A32] mb-3 flex items-center gap-2 mt-6">
-                    <Clock className="h-3 w-3" /> Pending verification ({guardians.filter(g => !g.isVerified).length})
-                  </p>
-                  <div className="space-y-3">
-                    {guardians.filter(g => !g.isVerified).map((g) => (
-                      <GuardianCard
-                        key={g._id}
-                        guardian={g}
-                        onEdit={setEditingGuardian}
-                        onRemove={handleRemoveFromList}
-                        onVerify={setVerifyingGuardian}
-                        showToast={showToast}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
+            <div className="space-y-3">
+              {guardians.map((guardian) => (
+                <GuardianCard key={guardian._id} guardian={guardian} onEdit={setEditingGuardian} onRemove={handleRemoveFromList} showToast={showToast} />
+              ))}
+            </div>
           )}
         </div>
       </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Hospital, Navigation, Search, Shield, ShieldAlert, Star, Info, Loader2, ExternalLink, Compass, MapPin, RefreshCw } from 'lucide-react';
 import CustomMapContainer from '../components/Map/MapContainer';
+import { getCurrentPosition } from '../services/locationService';
 
 // Helper for exact distance in km
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -97,7 +98,11 @@ export default function MapPage() {
   const [locationName, setLocationName] = useState('Pune, Maharashtra');
   const [selectedPlaceId, setSelectedPlaceId] = useState(null);
   const [renderKey, setRenderKey] = useState(1);
-  const hasDetectedRef = useRef(false);
+  const [newsAlerts, setNewsAlerts] = useState([]);
+  const [showNewsRisk, setShowNewsRisk] = useState(false);
+  const [newsRiskFilter, setNewsRiskFilter] = useState('all');
+  const [isLoadingNewsRisk, setIsLoadingNewsRisk] = useState(false);
+  const newsAlertsLoadedRef = useRef(false);
 
   const showNotification = (msg) => {
     setToastMessage(msg);
@@ -114,6 +119,14 @@ export default function MapPage() {
         const response = await fetch(`/api/map/nearby?lat=${lat}&lng=${lon}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        if (response.status === 401) {
+          const error = await response.json().catch(() => ({}));
+          if (error.code === 'TOKEN_EXPIRED') {
+            ['authToken', 'token', 'accessToken', 'refreshToken', 'user'].forEach((key) => localStorage.removeItem(key));
+            window.location.hash = '#/login';
+            return;
+          }
+        }
         if (response.ok) {
           const json = await response.json();
           if (json.success && json.places && json.places.length > 0) {
@@ -145,13 +158,13 @@ export default function MapPage() {
   }, []);
 
   // Update location, map view, and reverse geocode
-  const applyCoordinates = useCallback((lat, lon, source = 'GPS') => {
+  const applyCoordinates = useCallback((lat, lon, source = 'GPS', accuracy = null) => {
     setUserLocation([lat, lon]);
     setMapCenter([lat, lon]);
     setRenderKey((k) => k + 1);
     setIsLoadingGeo(false);
-    setLocationName(`Live Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`);
-    showNotification(`📍 Map rendered at ${source}: ${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+    setLocationName(accuracy ? `Live Location (within ${Math.round(accuracy)} m)` : `Live Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`);
+    showNotification(`Map centered using ${source}${accuracy ? ` (within ${Math.round(accuracy)} m)` : ''}`);
     fetchNearbyPOIs(lat, lon);
 
     // Reverse geocode to get locality
@@ -172,45 +185,15 @@ export default function MapPage() {
     setIsLoadingGeo(true);
     showNotification('🛰️ Scanning live coordinates & rendering map...');
 
-    // Try high-accuracy device GPS
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          hasDetectedRef.current = true;
-          applyCoordinates(pos.coords.latitude, pos.coords.longitude, 'Live Device GPS');
-        },
-        (err) => {
-          console.warn('GPS sensor fallback:', err.message);
-          // Fallback to IP Geolocation immediately
-          fetch('https://ipwho.is/')
-            .then((res) => res.json())
-            .then((data) => {
-              if (data && data.latitude && data.longitude) {
-                applyCoordinates(data.latitude, data.longitude, `Network (${data.city || 'Local Area'})`);
-              } else {
-                applyCoordinates(18.5204, 73.8567, 'Local Map Zone');
-              }
-            })
-            .catch(() => {
-              applyCoordinates(18.5204, 73.8567, 'Local Map Zone');
-            });
-        },
-        { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
-      );
-    } else {
-      fetch('https://ipwho.is/')
-        .then((res) => res.json())
-        .then((data) => {
-          if (data && data.latitude && data.longitude) {
-            applyCoordinates(data.latitude, data.longitude, `Network (${data.city || 'Local Area'})`);
-          } else {
-            applyCoordinates(18.5204, 73.8567, 'Local Map Zone');
-          }
-        })
-        .catch(() => {
-          applyCoordinates(18.5204, 73.8567, 'Local Map Zone');
-        });
-    }
+    getCurrentPosition()
+      .then((position) => {
+        applyCoordinates(position.latitude, position.longitude, 'device location', position.accuracy);
+      })
+      .catch((err) => {
+        console.warn('Live location unavailable:', err.message);
+        setIsLoadingGeo(false);
+        showNotification('Location unavailable. Allow location access in your browser, then try again.');
+      });
   }, [applyCoordinates]);
 
   // Search places using OpenStreetMap Nominatim
@@ -248,6 +231,31 @@ export default function MapPage() {
     handleRenderLiveLocation();
   }, [handleRenderLiveLocation]);
 
+  const toggleNewsRisk = async () => {
+    if (showNewsRisk) {
+      setShowNewsRisk(false);
+      return;
+    }
+
+    if (!newsAlertsLoadedRef.current) {
+      setIsLoadingNewsRisk(true);
+      try {
+        const response = await fetch('/api/news/map-alerts');
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Unable to load stored alerts');
+        setNewsAlerts(data.alerts || []);
+        newsAlertsLoadedRef.current = true;
+        if (!data.alerts?.length) showNotification('No saved location-based news alerts are available yet.');
+      } catch (error) {
+        showNotification(error.message || 'Unable to load stored news alerts.');
+        return;
+      } finally {
+        setIsLoadingNewsRisk(false);
+      }
+    }
+    setShowNewsRisk(true);
+  };
+
   const filteredPois = useMemo(() => {
     return pois.filter((poi) => {
       const matchesFilter = activeFilter === 'All' || poi.type.toLowerCase().includes(activeFilter.toLowerCase());
@@ -255,6 +263,21 @@ export default function MapPage() {
       return matchesFilter && matchesSearch;
     });
   }, [pois, activeFilter, searchQuery]);
+
+  const mapPois = useMemo(
+    () => {
+      const filteredNewsAlerts = newsRiskFilter === 'all'
+        ? newsAlerts
+        : newsAlerts.filter((alert) => alert.riskLevel === newsRiskFilter);
+      return showNewsRisk ? [...filteredPois, ...filteredNewsAlerts] : filteredPois;
+    },
+    [filteredPois, newsAlerts, newsRiskFilter, showNewsRisk]
+  );
+
+  const visibleNewsAlerts = useMemo(
+    () => newsRiskFilter === 'all' ? newsAlerts : newsAlerts.filter((alert) => alert.riskLevel === newsRiskFilter),
+    [newsAlerts, newsRiskFilter]
+  );
 
   return (
     <div className="page-shell min-h-screen pt-20">
@@ -359,6 +382,55 @@ export default function MapPage() {
 
           {/* POI List */}
           <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-3">
+            {showNewsRisk && (
+              <section className="mb-5 space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#687067]">News-based safety areas</p>
+                  <span className="text-[11px] font-semibold text-[#C62828]">{visibleNewsAlerts.length} mapped</span>
+                </div>
+                <select
+                  value={newsRiskFilter}
+                  onChange={(event) => setNewsRiskFilter(event.target.value)}
+                  className="premium-select w-full text-sm"
+                  aria-label="Filter news safety areas by risk level"
+                >
+                  <option value="all">All news safety areas</option>
+                  <option value="high">High danger zones</option>
+                  <option value="medium">Medium risk zones</option>
+                  <option value="low">Low risk and awareness zones</option>
+                </select>
+                {visibleNewsAlerts.map((alert) => {
+                  const tone = alert.riskLevel === 'high'
+                    ? 'border-[#C62828]/30 bg-[#C62828]/10 text-[#B71C1C]'
+                    : alert.riskLevel === 'medium'
+                      ? 'border-[#C18A32]/30 bg-[#C18A32]/10 text-[#956616]'
+                      : 'border-[#4F7D55]/30 bg-[#4F7D55]/10 text-[#37613D]';
+                  return (
+                    <article
+                      key={alert.id}
+                      onClick={() => {
+                        setMapCenter([alert.lat, alert.lon]);
+                        setSelectedPlaceId(alert.id);
+                        setRenderKey((key) => key + 1);
+                      }}
+                      className="cursor-pointer border border-[#DCDDD5] border-l-4 bg-white p-3 transition hover:bg-[#FAF8F5]"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${alert.riskLevel === 'high' ? 'bg-[#C62828]' : alert.riskLevel === 'medium' ? 'bg-[#C18A32]' : 'bg-[#4F7D55]'}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-sm font-semibold leading-snug text-[#28302A]">{alert.name}</p>
+                          <p className="mt-1 text-xs text-[#687067]">{alert.locationName}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${tone}`}>{alert.status}</span>
+                        <a href={alert.articleUrl} target="_blank" rel="noopener noreferrer" onClick={(event) => event.stopPropagation()} className="text-xs font-semibold text-[#7A8E72] hover:underline">Article</a>
+                      </div>
+                    </article>
+                  );
+                })}
+              </section>
+            )}
             <div className="flex items-center justify-between px-1">
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#687067]">
                 {filteredPois.length} Safe Places Found
@@ -438,6 +510,15 @@ export default function MapPage() {
           {/* Floating Actions on Top of Map */}
           <div className="absolute top-5 right-5 z-[1000] flex items-center gap-2">
             <button
+              onClick={toggleNewsRisk}
+              disabled={isLoadingNewsRisk}
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold shadow-lg backdrop-blur-md transition disabled:opacity-50 ${showNewsRisk ? 'bg-[#C62828] text-white hover:bg-[#A51F1F]' : 'bg-white border border-[#DCDDD5] text-[#28302A] hover:bg-[#FAF8F5]'}`}
+              title="Show saved news-based safety alerts"
+            >
+              {isLoadingNewsRisk ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className={`h-4 w-4 ${showNewsRisk ? 'text-white' : 'text-[#C62828]'}`} />}
+              <span>{showNewsRisk ? 'Hide news alerts' : 'Show news alerts'}</span>
+            </button>
+            <button
               onClick={handleRenderLiveLocation}
               disabled={isLoadingGeo}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#7A8E72] hover:bg-[#66775f] text-white text-xs font-bold shadow-lg backdrop-blur-md transition hover:scale-105 active:scale-95 disabled:opacity-50"
@@ -468,9 +549,10 @@ export default function MapPage() {
             <CustomMapContainer
               userLocation={userLocation}
               mapCenter={mapCenter}
-              pois={filteredPois}
+              pois={mapPois}
               selectedPoiId={selectedPlaceId}
               renderKey={renderKey}
+              fitToNewsAlerts={showNewsRisk}
               onSelectPoi={(poi) => {
                 setSelectedPlaceId(poi.id || poi._id);
                 setMapCenter([poi.lat, poi.lon]);

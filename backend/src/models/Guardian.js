@@ -7,6 +7,7 @@ const guardianSchema = new mongoose.Schema({
     type: String, required: true, trim: true,
     match: [/^[6-9]\d{9}$/, 'Please provide a valid Indian mobile number']
   },
+  guardianEmail: { type: String, required: true, trim: true, lowercase: true },
   relation: { 
     type: String, required: true,
     enum: ['Mother', 'Father', 'Sister', 'Brother', 'Friend', 'Partner', 'Colleague', 'Other']

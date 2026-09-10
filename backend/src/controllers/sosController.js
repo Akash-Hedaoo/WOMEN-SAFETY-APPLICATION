@@ -2,6 +2,7 @@ const SosAlert = require('../models/SosAlert');
 const Guardian = require('../models/Guardian');
 const { getIO } = require('../config/socket');
 const twilio = require('twilio');
+const { sendGuardianEmail } = require('../services/emailService');
 
 const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER
   ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
@@ -50,6 +51,21 @@ const sendSMSToGuardian = async (guardian, alertData) => {
     return { success: false };
   }
 };
+
+const sendSosEmailToGuardian = (guardian, alertData) => {
+  const location = alertData.googleMapsLink || 'Location unavailable';
+  return sendGuardianEmail({
+    to: guardian.guardianEmail,
+    subject: `SOS ALERT: ${alertData.userName} may need help`,
+    text: `Safe-Era SOS alert\n\n${alertData.userName} may be in danger and triggered SOS.\nLocation: ${location}\nVerification code: ${alertData.otp || 'N/A'}\n\nPlease contact them immediately and take necessary action.`
+  });
+};
+
+const sendStatusEmailToGuardian = (guardian, subject, message) => sendGuardianEmail({
+  to: guardian.guardianEmail,
+  subject,
+  text: message
+});
 
 const triggerSos = async (req, res) => {
   try {
@@ -156,6 +172,7 @@ const triggerSos = async (req, res) => {
 
     let smsSentCount = 0;
     let smsFailedCount = 0;
+    let emailSentCount = 0;
 
     if (guardians && guardians.length > 0 && deliveryMethod !== 'device_sms') {
       const smsResults = await Promise.allSettled(guardians.map(g => sendSMSToGuardian(g, alertData)));
@@ -178,6 +195,11 @@ const triggerSos = async (req, res) => {
       sosAlert.guardiansAlerted = guardians.length;
       sosAlert.smsSentCount = smsSentCount;
       sosAlert.smsFailedCount = 0;
+    }
+
+    if (guardians && guardians.length > 0) {
+      const emailResults = await Promise.allSettled(guardians.map((guardian) => sendSosEmailToGuardian(guardian, alertData)));
+      emailSentCount = emailResults.filter((result) => result.status === 'fulfilled' && result.value.success).length;
     }
 
     await sosAlert.save();
@@ -210,7 +232,8 @@ const triggerSos = async (req, res) => {
       alert: sosAlert,
       guardiansAlerted: sosAlert.guardiansAlerted,
       smsSent: smsSentCount,
-      smsFailed: smsFailedCount
+      smsFailed: smsFailedCount,
+      emailSent: emailSentCount
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -262,6 +285,11 @@ const cancelSos = async (req, res) => {
       };
 
       await Promise.allSettled(guardians.map(g => sendSMS(g)));
+      await Promise.allSettled(guardians.map((guardian) => sendStatusEmailToGuardian(
+        guardian,
+        `SOS cancelled: ${req.user.name} is safe`,
+        `FALSE ALARM - ${req.user.name} is safe. The Safe-Era SOS alert has been cancelled.`
+      )));
     }
 
     return res.status(200).json({ success: true, message: "SOS alert cancelled. Guardians have been notified." });
@@ -318,6 +346,11 @@ const markSafe = async (req, res) => {
       };
 
       await Promise.allSettled(guardians.map(g => sendSMS(g)));
+      await Promise.allSettled(guardians.map((guardian) => sendStatusEmailToGuardian(
+        guardian,
+        `Safe update: ${req.user.name} is safe`,
+        `SAFE - ${req.user.name} is now safe. The Safe-Era emergency has been resolved.`
+      )));
     }
 
     return res.status(200).json({ success: true, message: "You are now marked as safe", alert });
@@ -451,4 +484,3 @@ module.exports = {
   getIcccIncidents,
   updateIcccIncidentStatus
 };
-

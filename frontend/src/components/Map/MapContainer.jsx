@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { MapContainer as LeafletMap, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import React, { useEffect, useState } from 'react';
+import { Circle, MapContainer as LeafletMap, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -28,7 +28,7 @@ const customMarkerStyle = `
   }
 `;
 
-const createIcon = (type, isSelected = false) => {
+const createIcon = (type, isSelected = false, riskLevel = null) => {
   const t = type?.toLowerCase() || '';
   let bgColor, iconSvg, borderColor;
 
@@ -41,8 +41,14 @@ const createIcon = (type, isSelected = false) => {
     borderColor = '#9b1c1c';
     iconSvg = `<svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6v12M6 12h12"/><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/></svg>`;
   } else if (t.includes('sos') || t.includes('incident') || t.includes('alert')) {
-    bgColor = '#C62828';
-    borderColor = '#9b1c1c';
+    const riskColors = {
+      high: { background: '#C62828', border: '#9b1c1c' },
+      medium: { background: '#C18A32', border: '#956616' },
+      low: { background: '#4F7D55', border: '#37613D' }
+    };
+    const colors = riskColors[riskLevel] || riskColors.high;
+    bgColor = colors.background;
+    borderColor = colors.border;
     iconSvg = `<svg class="w-5 h-5 text-white animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
   } else {
     // Safe Zone / Community Hub
@@ -85,6 +91,12 @@ const userIcon = new L.DivIcon({
   popupAnchor: [0, -28]
 });
 
+const newsRiskStyles = {
+  high: { color: '#C62828', fillColor: '#C62828', radius: 3500 },
+  medium: { color: '#C18A32', fillColor: '#C18A32', radius: 2500 },
+  low: { color: '#4F7D55', fillColor: '#4F7D55', radius: 1800 }
+};
+
 function MapViewController({ center, zoom = 14, renderKey }) {
   const map = useMap();
 
@@ -105,6 +117,24 @@ function MapViewController({ center, zoom = 14, renderKey }) {
   return null;
 }
 
+function MapAlertBounds({ pois, enabled }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!enabled) return;
+    const points = pois
+      .filter((poi) => poi.articleUrl)
+      .map((poi) => [poi.lat || poi.location?.coordinates?.[1], poi.lon || poi.lng || poi.location?.coordinates?.[0]])
+      .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
+
+    if (points.length) {
+      map.fitBounds(L.latLngBounds(points), { padding: [48, 48], maxZoom: 7, animate: true });
+    }
+  }, [enabled, pois, map]);
+
+  return null;
+}
+
 export default function CustomMapContainer({
   location,
   userLocation,
@@ -113,8 +143,10 @@ export default function CustomMapContainer({
   selectedPoiId = null,
   onSelectPoi = null,
   zoom = 14,
-  renderKey = 0
+  renderKey = 0,
+  fitToNewsAlerts = false
 }) {
+  const [tilesUnavailable, setTilesUnavailable] = useState(false);
   const effectiveUserLoc = userLocation || location || [28.6139, 77.2090];
   const effectiveCenter = mapCenter || location || userLocation || [28.6139, 77.2090];
 
@@ -136,11 +168,16 @@ export default function CustomMapContainer({
         zoomControl={true}
       >
         <MapViewController center={validCenter} zoom={zoom} renderKey={renderKey} />
+        <MapAlertBounds pois={pois} enabled={fitToNewsAlerts} />
         
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           maxZoom={19}
+          eventHandlers={{
+            load: () => setTilesUnavailable(false),
+            tileerror: () => setTilesUnavailable(true),
+          }}
         />
 
         {/* User Current Live Location Marker */}
@@ -158,6 +195,21 @@ export default function CustomMapContainer({
           </Popup>
         </Marker>
 
+        {pois.filter((poi) => poi.articleUrl).map((alert) => {
+          const lat = alert.lat || alert.location?.coordinates?.[1];
+          const lon = alert.lon || alert.lng || alert.location?.coordinates?.[0];
+          if (!lat || !lon) return null;
+          const style = newsRiskStyles[alert.riskLevel] || newsRiskStyles.low;
+          return (
+            <Circle
+              key={`risk-area-${alert.id || alert._id || `${lat}-${lon}`}`}
+              center={[lat, lon]}
+              radius={style.radius}
+              pathOptions={{ color: style.color, fillColor: style.fillColor, fillOpacity: 0.14, weight: 1.5 }}
+            />
+          );
+        })}
+
         {/* POI Markers */}
         {pois.map((poi) => {
           const lat = poi.lat || poi.location?.coordinates?.[1];
@@ -171,7 +223,7 @@ export default function CustomMapContainer({
             <Marker
               key={poi.id || poi._id || `${lat}-${lon}`}
               position={[lat, lon]}
-              icon={createIcon(poi.type, isSelected)}
+              icon={createIcon(poi.type, isSelected, poi.riskLevel)}
               eventHandlers={{
                 click: () => {
                   if (onSelectPoi) onSelectPoi(poi);
@@ -199,21 +251,40 @@ export default function CustomMapContainer({
                   {poi.status && (
                     <p className="text-[11px] text-[#687067] mt-0.5">{poi.status}</p>
                   )}
+                  {poi.locationName && (
+                    <p className="text-[11px] text-[#687067] mt-0.5">Reported location: {poi.locationName}</p>
+                  )}
                   
-                  <a
-                    href={navUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 block w-full py-1.5 px-3 rounded-lg bg-[#7A8E72] hover:bg-[#66775f] text-white text-xs font-semibold text-center transition"
-                  >
-                    Directions ↗
-                  </a>
+                  {poi.articleUrl ? (
+                    <a
+                      href={poi.articleUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 block w-full py-1.5 px-3 rounded-lg bg-[#7A8E72] hover:bg-[#66775f] text-white text-xs font-semibold text-center transition"
+                    >
+                      Read article ↗
+                    </a>
+                  ) : (
+                    <a
+                      href={navUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 block w-full py-1.5 px-3 rounded-lg bg-[#7A8E72] hover:bg-[#66775f] text-white text-xs font-semibold text-center transition"
+                    >
+                      Directions ↗
+                    </a>
+                  )}
                 </div>
               </Popup>
             </Marker>
           );
         })}
       </LeafletMap>
+      {tilesUnavailable && (
+        <div className="pointer-events-none absolute inset-x-4 bottom-4 z-[500] rounded-lg border border-[#DCDDD5] bg-white/95 px-3 py-2 text-center text-xs font-medium text-[#687067] shadow-sm">
+          Map tiles could not load. Check your internet connection and reload the page.
+        </div>
+      )}
     </div>
   );
 }

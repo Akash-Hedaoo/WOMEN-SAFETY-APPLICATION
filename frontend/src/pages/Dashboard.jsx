@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import CustomMapContainer from '../components/Map/MapContainer';
 import StatusCard from '../components/Dashboard/StatusCard';
+import { getBestAvailablePosition } from '../services/locationService';
 
 const AnimatedCounter = ({ label, target, duration = 1.2, icon: Icon, tone }) => {
   const [count, setCount] = useState(0);
@@ -57,22 +58,11 @@ export default function Dashboard() {
   const [mapLocation, setMapLocation] = useState([28.6139, 77.2090]);
 
   useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => setMapLocation([position.coords.latitude, position.coords.longitude]),
-        () => {
-          fetch('https://ipwho.is/')
-            .then(res => res.json())
-            .then(data => {
-              if (data && data.latitude && data.longitude) {
-                setMapLocation([data.latitude, data.longitude]);
-              }
-            })
-            .catch(() => void 0);
-        },
-        { enableHighAccuracy: true, timeout: 6000 }
-      );
-    }
+    getBestAvailablePosition()
+      .then((position) => {
+        if (position) setMapLocation([position.latitude, position.longitude]);
+      })
+      .catch(() => void 0);
   }, []);
 
   const activities = [

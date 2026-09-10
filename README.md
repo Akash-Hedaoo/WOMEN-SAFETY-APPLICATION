@@ -657,6 +657,24 @@ npm run dev    # -> http://localhost:5173
 | `POST` | `/guardian` | Add a new guardian contact | Yes |
 | `DELETE` | `/guardian/:id` | Remove a guardian contact | Yes |
 
+### Live News Route — `/api/news`
+
+| Method | Endpoint | Description | Auth Required |
+|:------:|:---------|:------------|:-------------:|
+| `GET` | `/news` | Fetch live India-focused women's safety news | No |
+| `GET` | `/news?refresh=true` | Force a source refresh and update stored news records | No |
+| `GET` | `/news/map-alerts` | Fetch stored, location-bearing news records for the map | No |
+
+The News page uses the Google News India public RSS feed with the query `women safety India`. The backend refreshes it every 10 minutes, and the News page Refresh button can request an immediate update. A single MongoDB collection, `NewsArticle`, stores each article once using its unique publisher URL, along with title, source, date, risk level, article link, and optional India location coordinates. Articles without a detected India location store `null` coordinates and do not appear on the map. The map reads only these stored records; it never calls the news provider.
+
+| Label | Meaning |
+|:------|:--------|
+| Red | Reported severe or violent incident |
+| Orange | Reported safety concern, complaint, or investigation |
+| Green | Safety awareness, support, or prevention update |
+
+These labels describe the reported article, not an official safety rating for an entire area.
+
 <br>
 
 <img src="https://capsule-render.vercel.app/api?type=rect&color=8b5cf6&height=4" width="100%">

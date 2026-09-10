@@ -28,7 +28,8 @@ export async function getCurrentPosition() {
 
     const pos = await Geolocation.getCurrentPosition({
       enableHighAccuracy: true,
-      timeout: 8000,
+      timeout: 20000,
+      maximumAge: 5000,
     });
 
     const result = {
@@ -46,12 +47,7 @@ export async function getCurrentPosition() {
     throw new Error('Geolocation not available');
   }
 
-  const pos = await new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 8000,
-    });
-  });
+  const pos = await getAccurateBrowserPosition();
 
   const result = {
     latitude: pos.coords.latitude,
@@ -61,6 +57,44 @@ export async function getCurrentPosition() {
   };
   cacheLocation(result);
   return result;
+}
+
+function getAccurateBrowserPosition() {
+  return new Promise((resolve, reject) => {
+    let bestPosition = null;
+    let finished = false;
+
+    const finish = (callback, value) => {
+      if (finished) return;
+      finished = true;
+      navigator.geolocation.clearWatch(watchId);
+      clearTimeout(timeoutId);
+      callback(value);
+    };
+
+    // A watch gives browsers time to refine a coarse Wi-Fi reading into a GPS reading.
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        if (!bestPosition || position.coords.accuracy < bestPosition.coords.accuracy) {
+          bestPosition = position;
+        }
+
+        if (position.coords.accuracy <= 50) {
+          finish(resolve, position);
+        }
+      },
+      (error) => finish(reject, error),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+    );
+
+    const timeoutId = setTimeout(() => {
+      if (bestPosition) {
+        finish(resolve, bestPosition);
+      } else {
+        finish(reject, new Error('Unable to get a location reading'));
+      }
+    }, 20000);
+  });
 }
 
 /**
