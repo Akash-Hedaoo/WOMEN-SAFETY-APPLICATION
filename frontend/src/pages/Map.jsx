@@ -284,63 +284,30 @@ export default function MapPage() {
     <div className="page-shell min-h-screen pt-20">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed left-1/2 top-24 z-[2000] -translate-x-1/2 rounded-full border border-[#DCDDD5] bg-white px-6 py-3 text-sm text-[#28302A] shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-4">
-          <span className="inline-flex items-center gap-2 font-medium">
-            <Info className="h-4 w-4 text-[#7A8E72]" />
-            {toastMessage}
-          </span>
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[2000] bg-[#28302A] text-white px-5 py-2.5 rounded-full text-xs font-semibold shadow-xl border border-white/20 animate-fade-in flex items-center gap-2">
+          {toastMessage}
         </div>
       )}
 
-      <div className="mx-auto grid h-[calc(100vh-5.5rem)] max-w-7xl gap-5 px-4 pb-4 sm:px-6 lg:grid-cols-[420px_1fr] lg:px-8">
-        {/* Left Sidebar */}
-        <aside className="premium-panel-strong flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-[#DCDDD5] bg-white shadow-sm">
-          <div className="border-b border-[#DCDDD5] p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-[#7A8E72]">Live Safety Map</p>
-                <h1 className="mt-1 font-headline text-2xl font-bold text-[#28302A]">Safe Places Nearby</h1>
-                <p className="mt-1 text-xs text-[#687067] font-medium truncate max-w-[280px]" title={locationName}>
-                  📍 {locationName}
-                </p>
-              </div>
-              <button
-                onClick={handleRenderLiveLocation}
-                disabled={isLoadingGeo}
-                className="rounded-2xl border border-[#DCDDD5] bg-[#FAF0EA] p-3 text-[#7A8E72] transition hover:bg-[#f3e5dc] hover:scale-105 active:scale-95 disabled:opacity-50 shadow-sm"
-                aria-label="Re-render location"
-                title="Click to Render My Current Location"
-              >
-                {isLoadingGeo ? <Loader2 className="h-5 w-5 animate-spin text-[#7A8E72]" /> : <Navigation className="h-5 w-5 text-[#7A8E72]" />}
-              </button>
-            </div>
-
-            {/* BIG PROMINENT RENDER BUTTON */}
+      {/* Main Container: Stacked flex on mobile, Grid on desktop */}
+      <div className="mx-auto flex flex-col lg:grid lg:grid-cols-[420px_1fr] h-auto lg:h-[calc(100vh-5.5rem)] max-w-7xl gap-5 px-4 pb-28 sm:px-6 lg:px-8 lg:pb-4">
+        {/* Upper Box on Mobile / Left Sidebar on Desktop (Safe Places & Search) */}
+        <aside className="premium-panel-strong flex flex-col overflow-hidden rounded-[24px] border border-[#DCDDD5] bg-white shadow-sm h-[520px] sm:h-[560px] lg:h-full lg:min-h-0">
+          {/* Search Header */}
+          <div className="border-b border-[#DCDDD5] bg-[#FAF8F5]/80 p-4 backdrop-blur-sm">
+            {/* Top Bar Button for GPS */}
             <button
               onClick={handleRenderLiveLocation}
               disabled={isLoadingGeo}
-              className="mt-4 w-full py-3.5 px-4 rounded-2xl bg-[#7A8E72] hover:bg-[#66775f] text-white font-bold text-sm flex items-center justify-center gap-2.5 shadow-md active:scale-[0.98] transition"
+              className="w-full mb-3 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#7A8E72] hover:bg-[#66775f] text-white text-xs font-bold shadow-md transition disabled:opacity-50"
             >
-              {isLoadingGeo ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin text-white" />
-                  <span>Scanning & Rendering Map...</span>
-                </>
-              ) : (
-                <>
-                  <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E8C4B8] opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-[#E8C4B8]"></span>
-                  </span>
-                  <span>📍 Click to Render Live Location</span>
-                </>
-              )}
+              <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse" />
+              <span>📍 Click to Render Live Location</span>
             </button>
 
-            {/* Search Form */}
-            <form onSubmit={handleSearchSubmit} className="mt-3.5 flex gap-2">
-              <div className="relative flex-1 rounded-2xl border border-[#DCDDD5] bg-[#FAF8F5] px-3 py-2.5 flex items-center">
-                <Search className="h-4 w-4 text-[#687067] mr-2 flex-shrink-0" />
+            <form onSubmit={handleSearchSubmit} className="flex gap-2">
+              <div className="relative flex-1 flex items-center gap-2 px-3.5 py-2 bg-[#FAF8F5] rounded-2xl border border-[#DCDDD5] focus-within:border-[#7A8E72] focus-within:ring-1 focus-within:ring-[#7A8E72]/20 transition">
+                <Search className="h-4 w-4 text-[#B8A99A] shrink-0" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -506,8 +473,8 @@ export default function MapPage() {
           </div>
         </aside>
 
-        {/* Right Map View */}
-        <section className="relative premium-panel-strong min-h-0 overflow-hidden p-2 rounded-[24px] border border-[#DCDDD5] bg-white shadow-sm">
+        {/* Lower Box on Mobile / Right Map View on Desktop */}
+        <section className="relative premium-panel-strong overflow-hidden p-2 rounded-[24px] border border-[#DCDDD5] bg-white shadow-sm h-[400px] sm:h-[460px] lg:h-full lg:min-h-0">
           {/* Floating Actions on Top of Map */}
           <div className="absolute top-5 right-5 z-[1000] flex items-center gap-2">
             <button
@@ -546,7 +513,7 @@ export default function MapPage() {
             </button>
           </div>
 
-          <div className="relative h-full w-full min-h-[420px] overflow-hidden rounded-[20px] border border-[#DCDDD5]">
+          <div className="relative h-full w-full overflow-hidden rounded-[20px] border border-[#DCDDD5]">
             <CustomMapContainer
               userLocation={userLocation}
               mapCenter={mapCenter}
