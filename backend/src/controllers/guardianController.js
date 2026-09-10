@@ -33,18 +33,13 @@ const sendSMS = async (to, body) => {
 
 const getGuardians = async (req, res) => {
   try {
-    const guardians = await Guardian.find({ userId: req.userId, isActive: true }).sort({ addedAt: -1 });
-
-    await Guardian.updateMany(
-      { userId: req.userId, isActive: true, isVerified: false },
-      { $set: { isVerified: true, acceptedAt: new Date(), verificationOTP: null, otpExpiry: null, otpAttempts: 0 } }
-    );
-
     const activeGuardians = await Guardian.find({ userId: req.userId, isActive: true }).sort({ addedAt: -1 });
 
     return res.status(200).json({
       success: true,
       guardians: activeGuardians,
+      verified: activeGuardians.filter(g => g.isVerified),
+      pending: activeGuardians.filter(g => !g.isVerified),
       total: activeGuardians.length
     });
   } catch (error) {

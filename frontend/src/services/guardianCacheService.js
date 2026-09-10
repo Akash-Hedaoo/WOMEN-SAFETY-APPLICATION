@@ -35,22 +35,21 @@ export async function syncGuardians() {
     if (!res.ok) return getCachedGuardians();
 
     const data = await res.json();
-    const allGuardians = [
-      ...(data.verified || []).map((g) => ({
-        _id: g._id,
-        guardianName: g.guardianName,
-        guardianPhone: g.guardianPhone,
-        relation: g.relation,
-        isVerified: true,
-      })),
-      ...(data.pending || []).map((g) => ({
-        _id: g._id,
-        guardianName: g.guardianName,
-        guardianPhone: g.guardianPhone,
-        relation: g.relation,
-        isVerified: false,
-      })),
-    ];
+    const rawList = Array.isArray(data.guardians)
+      ? data.guardians
+      : Array.isArray(data.verified) || Array.isArray(data.pending)
+      ? [...(data.verified || []), ...(data.pending || [])]
+      : Array.isArray(data)
+      ? data
+      : [];
+
+    const allGuardians = rawList.map((g) => ({
+      _id: g._id,
+      guardianName: g.guardianName,
+      guardianPhone: g.guardianPhone,
+      relation: g.relation,
+      isVerified: Boolean(g.isVerified ?? true),
+    }));
 
     // Cache to localStorage
     try {

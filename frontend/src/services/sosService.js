@@ -1,8 +1,8 @@
 /**
  * SOS Service — main orchestration for online/offline SOS flow.
  *
- * Online:  GPS → OTP → POST /api/sos/trigger → backend handles SMS via Twilio
- * Offline: GPS → OTP → native SMS composer → queue for backend sync
+ * Online:  GPS → OTP → native device SMS → POST /api/sos/trigger → backend broadcast
+ * Offline: GPS → OTP → native SMS composer / direct SIM SMS → queue for backend sync
  * No signal: GPS (cached) → OTP → queue locally → retry on reconnect
  */
 import { getCurrentPosition, getLastKnownPosition } from './locationService';
@@ -24,14 +24,12 @@ export function generateOTP() {
 
 /**
  * Generate a unique client-side SOS ID for idempotency.
- * Uses crypto.randomUUID() if available, otherwise fallback.
  * @returns {string} UUID string
  */
 export function generateClientSosId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  // Fallback for older WebViews
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -39,9 +37,6 @@ export function generateClientSosId() {
   });
 }
 
-/**
- * Get the auth token from localStorage.
- */
 function getAuthToken() {
   return (
     localStorage.getItem('authToken') ||
@@ -50,9 +45,6 @@ function getAuthToken() {
   );
 }
 
-/**
- * Get the stored user object.
- */
 function getStoredUser() {
   try {
     const raw = localStorage.getItem('user');
@@ -64,19 +56,6 @@ function getStoredUser() {
 
 /**
  * Main SOS trigger — handles online, offline, and no-signal scenarios.
- *
- * @param {{ triggerSource?: string, threatScore?: number, threatDetails?: object, message?: string }} options
- * @returns {{
- *   success: boolean,
- *   mode: 'online'|'offline_sms'|'queued_only',
- *   steps: Array<{ step: string, status: 'success'|'warning'|'pending'|'failed', detail: string }>,
- *   otp: string,
- *   clientSosId: string,
- *   location: object|null,
- *   alert?: object,
- *   smsResult?: object,
- *   error?: string
- * }}
  */
 export async function triggerSOS(options = {}) {
   const {
@@ -92,8 +71,6 @@ export async function triggerSOS(options = {}) {
   const user = getStoredUser();
   const token = getAuthToken();
 
-  // Determine connectivity before reading GPS. Online SOS must request a
-  // fresh GPS fix; offline SOS must use only the saved last-known location.
   let online = false;
   try {
     online = await isOnline();
@@ -120,8 +97,6 @@ export async function triggerSOS(options = {}) {
     steps.push({ step: 'Location', status: 'failed', detail: err.message });
   }
 
-  // Never invent coordinates. A false location is worse than an explicit
-  // "unavailable" status during an emergency.
   const latitude = location?.latitude ?? null;
   const longitude = location?.longitude ?? null;
   const locationType = location?.locationType ?? 'unavailable';
@@ -134,11 +109,19 @@ export async function triggerSOS(options = {}) {
   steps.push({ step: 'OTP', status: 'success', detail: `Emergency OTP: ${otp}` });
 
   // Send via the phone's SIM before attempting the server. This keeps device
-  // SMS working even when the backend has no SMS-provider credentials.
-  const cachedGuardians = getEmergencyCachedGuardians();
+  // SMS working directly from SIM.
+  let cachedGuardians = getEmergencyCachedGuardians();
+  if (cachedGuardians.length === 0 && online && token) {
+    try {
+      cachedGuardians = await syncGuardians();
+    } catch (e) {
+      console.warn('[SOS] Could not auto-sync guardians:', e);
+    }
+  }
+
   let deviceSmsResult = null;
   try {
-    if (cachedGuardians.length > 0 && await isSmsAvailable()) {
+    if (cachedGuardians && cachedGuardians.length > 0 && await isSmsAvailable()) {
       const smsBody = buildEmergencyMessage({
         userName: user?.name || 'A Safe-Era user',
         latitude,
@@ -153,10 +136,12 @@ export async function triggerSOS(options = {}) {
         status: deviceSmsResult.sent > 0 || deviceSmsResult.opened > 0 ? 'success' : 'failed',
         detail: deviceSmsResult.sent > 0
           ? `Emergency SMS sent from this phone to ${deviceSmsResult.sent}/${deviceSmsResult.total} guardians`
+          : deviceSmsResult.opened > 0
+          ? `SMS composer opened for ${deviceSmsResult.opened}/${deviceSmsResult.total} guardians`
           : 'Could not send emergency SMS from this device',
       });
-    } else if (cachedGuardians.length === 0) {
-      steps.push({ step: 'Device SMS', status: 'warning', detail: 'No saved guardians — add a guardian while online first' });
+    } else if (!cachedGuardians || cachedGuardians.length === 0) {
+      steps.push({ step: 'Device SMS', status: 'warning', detail: 'No saved guardians — add a guardian in Guardian Network' });
     } else {
       steps.push({ step: 'Device SMS', status: 'failed', detail: 'SMS is unavailable on this device' });
     }
@@ -249,10 +234,10 @@ export async function triggerSOS(options = {}) {
   }
 
   // Step 4: Offline SMS fallback
-  const guardians = getEmergencyCachedGuardians();
+  const guardians = cachedGuardians && cachedGuardians.length > 0 ? cachedGuardians : getEmergencyCachedGuardians();
   const smsAvailable = await isSmsAvailable();
 
-  if (guardians.length > 0 && smsAvailable) {
+  if (guardians && guardians.length > 0 && smsAvailable) {
     const smsBody = buildEmergencyMessage({
       userName: user?.name || 'A Safe-Era user',
       latitude,
@@ -266,7 +251,7 @@ export async function triggerSOS(options = {}) {
 
     steps.push({
       step: 'SMS',
-      status: smsResult.opened > 0 ? 'success' : 'failed',
+      status: (smsResult.sent > 0 || smsResult.opened > 0) ? 'success' : 'failed',
       detail: smsResult.sent > 0
         ? `Emergency SMS sent from this phone to ${smsResult.sent}/${smsResult.total} guardians`
         : smsResult.opened > 0
@@ -274,7 +259,6 @@ export async function triggerSOS(options = {}) {
         : 'Could not open SMS composer',
     });
 
-    // Queue with SMS status
     sosQueue.enqueue({
       clientSosId,
       otp,
@@ -285,8 +269,6 @@ export async function triggerSOS(options = {}) {
       timestamp: new Date().toISOString(),
       triggerSource,
       message,
-      // Preserve the offline message/location semantics if this alert is
-      // synchronized later. The detailed delivery result is stored separately.
       smsStatus: 'offline',
       smsDetails: smsResult.results,
       deviceSmsSent: smsResult.sent > 0,
@@ -307,7 +289,7 @@ export async function triggerSOS(options = {}) {
   }
 
   // Step 5: No SMS available — queue only
-  if (guardians.length === 0) {
+  if (!guardians || guardians.length === 0) {
     steps.push({ step: 'SMS', status: 'warning', detail: 'No cached guardians — add guardians first' });
   } else {
     steps.push({ step: 'SMS', status: 'failed', detail: 'SMS not available on this device' });
@@ -342,9 +324,6 @@ export async function triggerSOS(options = {}) {
 
 /**
  * Sync all pending offline SOS records to the backend.
- * Called when the app detects it's back online.
- *
- * @returns {{ synced: number, failed: number }}
  */
 export async function syncPendingSOS() {
   const token = getAuthToken();
@@ -391,26 +370,17 @@ export async function syncPendingSOS() {
     }
   }
 
-  // Cleanup old records
   sosQueue.cleanupOldRecords();
-
   return { synced, failed };
 }
 
 /**
  * Start a background listener that syncs pending SOS records when connectivity returns.
- * Should be called once on app mount.
- *
- * @returns {() => void} cleanup function
  */
 export function startAutoSync() {
-  // Sync immediately if online
   syncPendingSOS().catch(() => {});
-
-  // Sync guardians cache
   syncGuardians().catch(() => {});
 
-  // Listen for connectivity changes
   return addConnectivityListener(async (status) => {
     if (status.connected) {
       console.log('[SOS AutoSync] Connectivity restored — syncing pending records...');

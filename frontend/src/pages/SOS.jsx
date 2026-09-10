@@ -58,10 +58,18 @@ export default function SOSPage() {
 
       if (res.ok) {
         const data = await res.json();
-        const allGuardians = [
-          ...(data.verified || []).map((g) => ({ ...g, isVerified: true })),
-          ...(data.pending || []).map((g) => ({ ...g, isVerified: false }))
-        ];
+        const rawList = Array.isArray(data.guardians)
+          ? data.guardians
+          : Array.isArray(data.verified) || Array.isArray(data.pending)
+          ? [...(data.verified || []), ...(data.pending || [])]
+          : Array.isArray(data)
+          ? data
+          : [];
+
+        const allGuardians = rawList.map((g) => ({
+          ...g,
+          isVerified: Boolean(g.isVerified ?? true)
+        }));
         setGuardiansList(allGuardians);
       }
     } catch (err) {
