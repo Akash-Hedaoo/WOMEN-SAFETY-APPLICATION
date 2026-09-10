@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Shield, Activity, Mic, MapPin, AlertCircle, CheckCircle, RefreshCw, Zap, ShieldAlert } from 'lucide-react';
+import { Shield, Activity, Mic, MapPin, AlertCircle, CheckCircle, RefreshCw, Zap, ShieldAlert, Radio } from 'lucide-react';
 import { API_BASE_URL } from '../../utils/constants';
+import { getBestAvailablePosition } from '../../services/locationService';
 
 const clampScore = (score) => Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
 
@@ -25,25 +26,31 @@ const blobToBase64 = (blob) => new Promise((resolve, reject) => {
 
 export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
   const [isEnabled, setIsEnabled] = useState(false);
-  const [localMotionScore, setLocalMotionScore] = useState(12);
-  const [localAudioScore, setLocalAudioScore] = useState(8);
+  
+  // When Safety Mode is OFF: motion is 0%, voice is 0%
+  const [localMotionScore, setLocalMotionScore] = useState(0);
+  const [localAudioScore, setLocalAudioScore] = useState(0);
   const [movementAiScore, setMovementAiScore] = useState(null);
   const [voiceAiScore, setVoiceAiScore] = useState(null);
   const [movementActivity, setMovementActivity] = useState('Not checked');
-  const [voiceAiStatus, setVoiceAiStatus] = useState('Local only');
-  const [movementAiStatus, setMovementAiStatus] = useState('Local only');
-  const [gpsScore, setGpsScore] = useState(15);
+  const [voiceAiStatus, setVoiceAiStatus] = useState('Standby');
+  const [movementAiStatus, setMovementAiStatus] = useState('Standby');
   
-  // Sensor & Permission states (Fix #4)
+  // GPS route confidence calculated directly from live mobile GPS fix
+  const [gpsScore, setGpsScore] = useState(0);
+  const [gpsDetails, setGpsDetails] = useState(null);
+
+  // Sensor & Permission states
   const [, setMicPermission] = useState('prompt'); // 'prompt' | 'granted' | 'denied' | 'unsupported'
   const [, setMotionPermission] = useState('prompt');
   const [permissionError, setPermissionError] = useState(null);
 
-  // Soft check-in popup state (Medium threshold 40-74)
-  const [showCheckInModal, setShowCheckInModal] = useState(false);
-  const [checkInCountdown, setCheckInCountdown] = useState(15);
+  // 15-second Alert Modal countdown state
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertCountdown, setAlertCountdown] = useState(15);
+  const [alertReason, setAlertReason] = useState('');
   
-  // Active incident deduplication tracking (Fix #2)
+  // Active incident deduplication tracking
   const hasTriggeredForCurrentIncident = useRef(false);
 
   const audioContextRef = useRef(null);
@@ -53,25 +60,75 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
   const mediaRecorderRef = useRef(null);
   const recordingTimerRef = useRef(null);
   const monitoringRef = useRef(false);
-  const localMotionRef = useRef(12);
-  const localAudioRef = useRef(8);
+  const localMotionRef = useRef(0);
+  const localAudioRef = useRef(0);
   const motionSamplesRef = useRef([]);
   const lastVoiceAnalysisRef = useRef(0);
   const lastMovementAnalysisRef = useRef(0);
   const voiceAnalysisInFlightRef = useRef(false);
   const movementAnalysisInFlightRef = useRef(false);
 
-  const motionScore = fuseSafetyScores(localMotionScore, movementAiScore);
-  const audioScore = fuseSafetyScores(localAudioScore, voiceAiScore);
+  // Track and read mobile GPS coordinates continuously
+  useEffect(() => {
+    let isMounted = true;
 
-  // Calculate overall weighted score (0 - 100)
-  const overallThreatScore = Math.min(
-    100,
-    Math.round((motionScore * 0.35) + (audioScore * 0.35) + (gpsScore * 0.30))
-  );
+    async function updateGpsConfidence() {
+      try {
+        const pos = await getBestAvailablePosition();
+        if (!isMounted) return;
+
+        if (pos && Number.isFinite(pos.latitude) && Number.isFinite(pos.longitude)) {
+          const acc = pos.accuracy || 15;
+          // Calculate GPS Route / Location confidence:
+          // Excellent GPS (<=10m) -> 95-98%, Normal (15-30m) -> 85-92%, Low (50m+) -> 70%
+          const confidence = Math.max(45, Math.min(98, Math.round(100 - (acc * 0.5))));
+          setGpsScore(confidence);
+          setGpsDetails(pos);
+        } else {
+          setGpsScore(0);
+          setGpsDetails(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setGpsScore(0);
+          setGpsDetails(null);
+        }
+      }
+    }
+
+    updateGpsConfidence();
+    const interval = setInterval(updateGpsConfidence, 12000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const motionScore = isEnabled ? fuseSafetyScores(localMotionScore, movementAiScore) : 0;
+  const audioScore = isEnabled ? fuseSafetyScores(localAudioScore, voiceAiScore) : 0;
+
+  // Calculate Overall Threat Score (0 - 100)
+  // When Voice reaches 50 - 70, overall threat score reaches 70 - 90!
+  // When Motion reaches 50 - 70, overall threat score reaches 70 - 90!
+  let overallThreatScore = 0;
+  if (isEnabled) {
+    let score = Math.round((motionScore * 0.5) + (audioScore * 0.5));
+
+    if (audioScore >= 50) {
+      const voiceThreat = 70 + Math.min(25, ((audioScore - 50) / 20) * 20);
+      score = Math.max(score, Math.round(voiceThreat));
+    }
+
+    if (motionScore >= 50) {
+      const motionThreat = 70 + Math.min(25, ((motionScore - 50) / 20) * 20);
+      score = Math.max(score, Math.round(motionThreat));
+    }
+
+    overallThreatScore = clampScore(score);
+  }
 
   // Determine threat stage
-  const threatLevel = overallThreatScore >= 75 ? 'HIGH' : overallThreatScore >= 40 ? 'MEDIUM' : 'LOW';
+  const threatLevel = !isEnabled ? 'IDLE' : overallThreatScore >= 70 ? 'HIGH' : overallThreatScore >= 40 ? 'MEDIUM' : 'LOW';
 
   const updateLocalMotionScore = (nextScore) => {
     const score = clampScore(nextScore);
@@ -107,7 +164,7 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
         if (event.data?.size) chunks.push(event.data);
       };
       recorder.onerror = () => {
-        setVoiceAiStatus('Online AI unavailable — local monitoring active');
+        setVoiceAiStatus('Local monitoring active');
       };
       recorder.onstop = async () => {
         try {
@@ -122,9 +179,9 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
           const data = await response.json();
           if (!response.ok || !data.success) throw new Error(data.message || 'Online voice AI is unavailable.');
           setVoiceAiScore(clampScore(data.aiDistressScore));
-          setVoiceAiStatus(data.transcript ? `AI checked: “${data.transcript.slice(0, 72)}”` : 'AI checked: no speech detected');
+          setVoiceAiStatus(data.transcript ? `AI checked: “${data.transcript.slice(0, 72)}”` : 'AI checked: no distress speech');
         } catch {
-          setVoiceAiStatus('Online AI unavailable — local monitoring active');
+          setVoiceAiStatus('Local monitoring active');
         } finally {
           voiceAnalysisInFlightRef.current = false;
           mediaRecorderRef.current = null;
@@ -136,7 +193,7 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
       }, 4_000);
     } catch {
       voiceAnalysisInFlightRef.current = false;
-      setVoiceAiStatus('Online AI unavailable — local monitoring active');
+      setVoiceAiStatus('Local monitoring active');
     }
   }, []);
 
@@ -162,15 +219,21 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
       setMovementActivity(`${data.activity || 'unknown'} (${Math.round((data.confidence || 0) * 100)}%)`);
       setMovementAiStatus(data.abnormal ? 'AI flagged abnormal movement' : 'AI checked normal movement');
     } catch {
-      setMovementAiStatus('Online HAR unavailable — local monitoring active');
+      setMovementAiStatus('Local monitoring active');
     } finally {
       movementAnalysisInFlightRef.current = false;
     }
   }, []);
 
-  // Sensor Permission Request Handler (Fix #4)
+  // Sensor Permission & Activation Handler
   const requestSensorsPermission = async () => {
     setPermissionError(null);
+
+    // Set initial baseline scores on activation
+    updateLocalMotionScore(10);
+    updateLocalAudioScore(8);
+    setVoiceAiStatus('Local monitoring active');
+    setMovementAiStatus('Local monitoring active');
 
     // 1. Request Microphone access
     try {
@@ -179,7 +242,6 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
         micStreamRef.current = stream;
         setMicPermission('granted');
 
-        // Setup audio analysis node
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (AudioCtx) {
           const ctx = new AudioCtx();
@@ -201,19 +263,22 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
               sum += dataArray[i];
             }
             const average = sum / bufferLength;
-            // A scream usually has both amplitude and energy in the human
-            // voice band. This stays fully local and needs no network.
+            
+            // Distress scream detection: high energy in human voice frequency band (900Hz - 4000Hz)
             const binHz = ctx.sampleRate / analyser.fftSize;
             const startBin = Math.max(0, Math.floor(900 / binHz));
             const endBin = Math.min(bufferLength, Math.ceil(4_000 / binHz));
             let voiceBandSum = 0;
             for (let i = startBin; i < endBin; i++) voiceBandSum += dataArray[i];
             const voiceBandAverage = voiceBandSum / Math.max(1, endBin - startBin);
+            
             const volumeScore = (average / 128) * 100;
             const voiceBandScore = (voiceBandAverage / 128) * 100;
             const calculatedAudio = clampScore((volumeScore * 0.42) + (voiceBandScore * 0.58));
+            
             const nextAudio = Math.max(calculatedAudio, Math.max(5, localAudioRef.current - 2));
             updateLocalAudioScore(nextAudio);
+
             if (nextAudio >= 35) requestOnlineVoiceAnalysis();
             rafIdRef.current = requestAnimationFrame(updateVolume);
           };
@@ -229,7 +294,7 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
       setPermissionError('Microphone permission denied. Speech and noise detection will use fallback monitoring.');
     }
 
-    // 2. Request Motion sensor access (iOS Safari requirement)
+    // 2. Request Motion sensor access
     try {
       if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
         const res = await DeviceMotionEvent.requestPermission();
@@ -245,25 +310,13 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
 
     monitoringRef.current = true;
     setIsEnabled(true);
-
-    // Cleanup RAF on disable
-    return () => {
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-    };
   };
 
-  // Release microphone resources when the monitor unmounts. Toggling Safety
-  // Mode pauses sensor handling without invalidating an already granted permission.
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       monitoringRef.current = false;
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
       if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
       if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop();
       audioContextRef.current?.close?.().catch(() => {});
@@ -271,7 +324,7 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
     };
   }, []);
 
-  // Device Motion Listener
+  // Device Motion Listener for Violent Shaking / Jolt Detection
   useEffect(() => {
     if (!isEnabled) return;
 
@@ -298,9 +351,9 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
       });
       motionSamplesRef.current = motionSamplesRef.current.filter((sample) => now - sample.timestamp <= 10_000);
 
-      // Spike detection logic: sudden movement > 15 m/s²
-      if (totalDelta > 18) {
-        const spike = Math.min(100, Math.round(totalDelta * 3));
+      // Violent shake / jolt detection threshold: sudden movement > 16 m/s²
+      if (totalDelta > 16) {
+        const spike = Math.min(100, Math.round(totalDelta * 3.5));
         const nextMotion = updateLocalMotionScore(spike);
         if (nextMotion >= 35) requestOnlineMovementAnalysis();
       } else {
@@ -313,17 +366,32 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
     return () => window.removeEventListener('devicemotion', handleMotion);
   }, [isEnabled, requestOnlineMovementAnalysis]);
 
-  // Check-in Modal Countdown Timer (Medium Threat)
+  // 15-Second Alert Countdown Timer Effect
   useEffect(() => {
     let timer;
-    if (showCheckInModal) {
+    if (showAlertModal) {
       timer = setInterval(() => {
-        setCheckInCountdown((prev) => {
+        setAlertCountdown((prev) => {
           if (prev <= 1) {
-            // Expiration of check-in increases threat score further into High
-            setShowCheckInModal(false);
-            updateLocalMotionScore(Math.min(100, localMotionRef.current + 35));
-            updateLocalAudioScore(Math.min(100, localAudioRef.current + 35));
+            // 15-second countdown expired without dismissal -> Dispatch SOS immediately!
+            setShowAlertModal(false);
+            if (!hasTriggeredForCurrentIncident.current && onTriggerAutoSOS) {
+              hasTriggeredForCurrentIncident.current = true;
+              onTriggerAutoSOS({
+                triggerSource: 'threat_detection',
+                threatScore: overallThreatScore || 85,
+                threatDetails: {
+                  localMotionScore,
+                  movementAiScore,
+                  motionScore,
+                  localAudioScore,
+                  voiceAiScore,
+                  audioScore,
+                  gpsScore,
+                  reason: alertReason || 'High threat anomaly detected'
+                }
+              });
+            }
             return 15;
           }
           return prev - 1;
@@ -331,76 +399,71 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [showCheckInModal]);
+  }, [showAlertModal, overallThreatScore, localMotionScore, movementAiScore, motionScore, localAudioScore, voiceAiScore, audioScore, gpsScore, alertReason, onTriggerAutoSOS]);
 
-  // Handle Threat Threshold Escalation
+  // Threat Trigger Detection: Triggers 15-second timer when Threat Score reaches 70-90 (or high audio/motion)
   useEffect(() => {
     if (!isEnabled) return;
 
-    // Reset current incident flag when active incident is cleared/resolved
     if (!activeIncident) {
       hasTriggeredForCurrentIncident.current = false;
     }
 
-    // Medium Score Check-in Trigger (40 - 74)
-    if (overallThreatScore >= 40 && overallThreatScore < 75 && !showCheckInModal && !activeIncident) {
-      const openCheckInTimer = setTimeout(() => setShowCheckInModal(true), 0);
-      return () => clearTimeout(openCheckInTimer);
+    // When threat score reaches 70-90 (or voice/motion >= 50), start the 15-second countdown modal
+    if (overallThreatScore >= 70 && !showAlertModal && !hasTriggeredForCurrentIncident.current && !activeIncident) {
+      const reason = audioScore >= 50
+        ? `Distress audio scream spike detected (Voice: ${audioScore}%, Threat: ${overallThreatScore})`
+        : `Violent phone shaking / sudden impact detected (Motion: ${motionScore}%, Threat: ${overallThreatScore})`;
+      setAlertReason(reason);
+      setAlertCountdown(15);
+      setShowAlertModal(true);
     }
+  }, [overallThreatScore, audioScore, motionScore, isEnabled, showAlertModal, activeIncident]);
 
-    // High Score Auto-Escalation (75+)
-    if (overallThreatScore >= 75 && !hasTriggeredForCurrentIncident.current) {
-      // Fix #2: De-duplication safeguard
-      hasTriggeredForCurrentIncident.current = true;
-      setShowCheckInModal(false);
-      
-      if (onTriggerAutoSOS) {
-        onTriggerAutoSOS({
-          triggerSource: 'threat_detection',
-          threatScore: overallThreatScore,
-          threatDetails: {
-            localMotionScore,
-            movementAiScore,
-            motionScore,
-            localAudioScore,
-            voiceAiScore,
-            audioScore,
-            gpsScore
-          }
-        });
-      }
-    }
-  }, [overallThreatScore, isEnabled, activeIncident, showCheckInModal, onTriggerAutoSOS, localMotionScore, movementAiScore, motionScore, localAudioScore, voiceAiScore, audioScore, gpsScore]);
-
-  const handleDismissCheckIn = () => {
-    setShowCheckInModal(false);
-    setCheckInCountdown(15);
-    // Lower scores after "I'm fine" tap
+  const handleDismissAlert = () => {
+    setShowAlertModal(false);
+    setAlertCountdown(15);
+    // Lower scores to normal baseline after user confirms safety
     updateLocalMotionScore(10);
     updateLocalAudioScore(8);
     setMovementAiScore(null);
     setVoiceAiScore(null);
     setMovementActivity('Not checked');
-    setVoiceAiStatus('Local only');
-    setMovementAiStatus('Local only');
-    setGpsScore(12);
+    setVoiceAiStatus('Local monitoring active');
+    setMovementAiStatus('Local monitoring active');
   };
 
-  // Simulation handlers for demonstration
-  const simulateJolt = () => updateLocalMotionScore(88);
-  const simulateScream = () => updateLocalAudioScore(85);
-  const simulateGpsDev = () => setGpsScore(90);
+  // Interactive Simulation triggers
+  const simulateJolt = () => {
+    updateLocalMotionScore(85);
+  };
+
+  const simulateScream = () => {
+    // Setting audio to 65 scales overall threat score to ~85 (70-90 range)
+    updateLocalAudioScore(65);
+  };
+
+  const simulateGpsDev = () => {
+    setGpsScore((prev) => Math.max(25, prev - 45));
+  };
+
   const resetBaseline = () => {
-    updateLocalMotionScore(12);
-    updateLocalAudioScore(8);
+    if (isEnabled) {
+      updateLocalMotionScore(10);
+      updateLocalAudioScore(8);
+      setVoiceAiStatus('Local monitoring active');
+      setMovementAiStatus('Local monitoring active');
+    } else {
+      updateLocalMotionScore(0);
+      updateLocalAudioScore(0);
+      setVoiceAiStatus('Standby');
+      setMovementAiStatus('Standby');
+    }
     setMovementAiScore(null);
     setVoiceAiScore(null);
     setMovementActivity('Not checked');
-    setVoiceAiStatus('Local only');
-    setMovementAiStatus('Local only');
-    setGpsScore(14);
-    setShowCheckInModal(false);
-    setCheckInCountdown(15);
+    setShowAlertModal(false);
+    setAlertCountdown(15);
     hasTriggeredForCurrentIncident.current = false;
   };
 
@@ -416,6 +479,16 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
     micStreamRef.current = null;
     audioAnalyserRef.current = null;
     mediaRecorderRef.current = null;
+    
+    // Reset motion and voice to 0 when disabled
+    updateLocalMotionScore(0);
+    updateLocalAudioScore(0);
+    setMovementAiScore(null);
+    setVoiceAiScore(null);
+    setVoiceAiStatus('Standby');
+    setMovementAiStatus('Standby');
+    setShowAlertModal(false);
+    setAlertCountdown(15);
   };
 
   return (
@@ -434,7 +507,7 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
               </span>
             </div>
             <p className="text-xs text-[#687067] mt-0.5">
-              Local motion and voice detection works offline. Online AI only checks a short clip or sensor window after a local warning signal.
+              Live motion, voice distress analysis, and mobile GPS route confidence.
             </p>
           </div>
         </div>
@@ -481,7 +554,9 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
                     ? 'stroke-[#C62828]'
                     : threatLevel === 'MEDIUM'
                     ? 'stroke-[#C18A32]'
-                    : 'stroke-[#4F7D55]'
+                    : threatLevel === 'LOW'
+                    ? 'stroke-[#4F7D55]'
+                    : 'stroke-[#B8A99A]'
                 }`}
                 strokeWidth="8"
                 strokeDasharray={251.2}
@@ -507,10 +582,12 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
                   ? 'bg-[#C62828]/15 text-[#C62828] border border-[#C62828]/30 animate-pulse'
                   : threatLevel === 'MEDIUM'
                   ? 'bg-[#C18A32]/15 text-[#C18A32] border border-[#C18A32]/30'
-                  : 'bg-[#4F7D55]/15 text-[#4F7D55] border border-[#4F7D55]/30'
+                  : threatLevel === 'LOW'
+                  ? 'bg-[#4F7D55]/15 text-[#4F7D55] border border-[#4F7D55]/30'
+                  : 'bg-gray-100 text-[#687067] border border-[#DCDDD5]'
               }`}
             >
-              {threatLevel} RISK LEVEL
+              {threatLevel === 'IDLE' ? 'MONITORING STANDBY' : `${threatLevel} RISK LEVEL`}
             </span>
           </div>
         </div>
@@ -521,7 +598,7 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-semibold">
               <span className="inline-flex items-center gap-2 text-[#28302A]">
-                <Zap className="h-3.5 w-3.5 text-[#7A8E72]" /> Motion · local {localMotionScore}% / AI {movementAiScore ?? '—'}%
+                <Zap className="h-3.5 w-3.5 text-[#7A8E72]" /> Motion Sensor
               </span>
               <span className="font-mono text-[#687067]">{motionScore}%</span>
             </div>
@@ -531,14 +608,16 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
                 style={{ width: `${motionScore}%` }}
               />
             </div>
-            <p className="text-[10px] text-[#687067]">{movementAiStatus} · {movementActivity}</p>
+            <p className="text-[10px] text-[#687067]">
+              {isEnabled ? `${movementAiStatus} · ${movementActivity}` : 'Safety mode off (0%)'}
+            </p>
           </div>
 
-          {/* Signal 2: Audio */}
+          {/* Signal 2: Voice */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs font-semibold">
               <span className="inline-flex items-center gap-2 text-[#28302A]">
-                <Mic className="h-3.5 w-3.5 text-[#A8B8A0]" /> Voice · local {localAudioScore}% / AI {voiceAiScore ?? '—'}%
+                <Mic className="h-3.5 w-3.5 text-[#A8B8A0]" /> Voice Distress Level
               </span>
               <span className="font-mono text-[#687067]">{audioScore}%</span>
             </div>
@@ -548,7 +627,9 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
                 style={{ width: `${audioScore}%` }}
               />
             </div>
-            <p className="text-[10px] text-[#687067]">{voiceAiStatus}</p>
+            <p className="text-[10px] text-[#687067]">
+              {isEnabled ? voiceAiStatus : 'Safety mode off (0%)'}
+            </p>
           </div>
 
           {/* Signal 3: GPS */}
@@ -565,6 +646,11 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
                 style={{ width: `${gpsScore}%` }}
               />
             </div>
+            <p className="text-[10px] text-[#687067]">
+              {gpsDetails
+                ? `📍 Live Mobile GPS (±${Math.round(gpsDetails.accuracy || 0)}m accuracy)`
+                : 'Reading mobile GPS coordinates…'}
+            </p>
           </div>
         </div>
       </div>
@@ -578,23 +664,23 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
           <button
             onClick={simulateJolt}
             disabled={!isEnabled}
-            className="btn-secondary text-xs py-2 px-3 border-[#DCDDD5] hover:border-[#7A8E72]"
+            className="btn-secondary text-xs py-2 px-3 border-[#DCDDD5] hover:border-[#7A8E72] disabled:opacity-40"
           >
-            <Zap className="h-3.5 w-3.5 text-[#7A8E72]" /> Violent Jolt (+60)
+            <Zap className="h-3.5 w-3.5 text-[#7A8E72]" /> Violent Jolt (+85)
           </button>
           <button
             onClick={simulateScream}
             disabled={!isEnabled}
-            className="btn-secondary text-xs py-2 px-3 border-[#DCDDD5] hover:border-[#A8B8A0]"
+            className="btn-secondary text-xs py-2 px-3 border-[#DCDDD5] hover:border-[#A8B8A0] disabled:opacity-40"
           >
-            <Mic className="h-3.5 w-3.5 text-[#A8B8A0]" /> Audio Scream (+70)
+            <Mic className="h-3.5 w-3.5 text-[#A8B8A0]" /> Audio Scream (+65)
           </button>
           <button
             onClick={simulateGpsDev}
             disabled={!isEnabled}
-            className="btn-secondary text-xs py-2 px-3 border-[#DCDDD5] hover:border-[#4F7D55]"
+            className="btn-secondary text-xs py-2 px-3 border-[#DCDDD5] hover:border-[#4F7D55] disabled:opacity-40"
           >
-            <MapPin className="h-3.5 w-3.5 text-[#4F7D55]" /> GPS Detour (+65)
+            <MapPin className="h-3.5 w-3.5 text-[#4F7D55]" /> GPS Detour (-45)
           </button>
           <button
             onClick={resetBaseline}
@@ -605,33 +691,40 @@ export default function AIThreatMonitor({ onTriggerAutoSOS, activeIncident }) {
         </div>
       </div>
 
-      {/* Soft Check-in Modal (Medium Score 40-74) */}
-      {showCheckInModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="max-w-md w-full rounded-3xl border border-[#C18A32]/40 bg-white p-6 text-center shadow-2xl space-y-5">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#C18A32]/15 text-[#C18A32] border border-[#C18A32]/30 animate-pulse">
-              <ShieldAlert className="h-8 w-8" />
+      {/* 15-Second Alert Countdown Modal */}
+      {showAlertModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="max-w-md w-full rounded-3xl border border-[#C62828]/40 bg-white p-6 text-center shadow-2xl space-y-5">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[#C62828] text-white shadow-xl animate-pulse">
+              <ShieldAlert className="h-10 w-10" />
             </div>
 
             <div>
-              <h3 className="font-headline text-2xl font-bold text-[#28302A]">Soft Safety Check-In</h3>
-              <p className="text-sm text-[#687067] mt-2">
-                Unusual motion or audio spike detected (Threat Score: {overallThreatScore}). Are you safe?
+              <span className="px-3 py-1 rounded-full bg-[#C62828]/15 text-[#C62828] border border-[#C62828]/30 text-[10px] font-bold uppercase tracking-widest">
+                CRITICAL THREAT DETECTED (SCORE: {overallThreatScore})
+              </span>
+              <h3 className="font-headline text-2xl font-bold text-[#28302A] mt-2">
+                Emergency Alert Escalation
+              </h3>
+              <p className="text-xs text-[#687067] mt-1.5">
+                {alertReason || 'Unusual motion or audio distress spike detected. Are you safe?'}
               </p>
             </div>
 
             <div className="flex flex-col items-center">
-              <div className="text-4xl font-mono font-bold text-[#C18A32]">{checkInCountdown}s</div>
+              <div className="text-5xl font-mono font-extrabold text-[#C62828] animate-bounce">
+                {alertCountdown}s
+              </div>
               <p className="text-xs text-[#687067] mt-1">
-                If no response, alert escalates automatically to emergency contacts.
+                Auto-dispatching SOS to nearby command center & emergency guardians in {alertCountdown} seconds.
               </p>
             </div>
 
             <button
-              onClick={handleDismissCheckIn}
-              className="w-full py-4 rounded-2xl bg-[#4F7D55] hover:bg-[#436b48] text-white font-bold text-base shadow-md"
+              onClick={handleDismissAlert}
+              className="w-full py-4 rounded-2xl bg-[#FAF0EA] hover:bg-[#f3e5dc] text-[#28302A] font-bold text-base border border-[#DCDDD5] shadow-md transition-all cursor-pointer"
             >
-              I'M FINE - DISMISS ALERT
+              I'M FINE - CANCEL ALERT
             </button>
           </div>
         </div>
