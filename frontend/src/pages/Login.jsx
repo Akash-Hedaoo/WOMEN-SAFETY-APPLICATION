@@ -30,11 +30,13 @@ export default function Login() {
       clearTimeout(timeoutId);
       const data = await response.json();
 
-      if (data.success) {
+      if (data.success && data.user?.role !== 'admin') {
         localStorage.setItem('authToken', data.accessToken);
         if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
         if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
         navigate(ROUTES.DASHBOARD);
+      } else if (data.requiresAdminLogin) {
+        setError('This is an Admin account. Please use Admin login.');
       } else if (data.requiresVerification) {
         setError('Please verify your email first. Check your inbox for the OTP.');
       } else {
@@ -137,6 +139,12 @@ export default function Login() {
                   New here?{' '}
                   <Link className="font-semibold text-[#7A8E72] hover:underline" to={ROUTES.SIGNUP}>
                     Create a free account
+                  </Link>
+                </p>
+                <p className="mt-3 text-sm text-[#687067]">
+                  ICCC operator?{' '}
+                  <Link className="font-semibold text-[#7A8E72] hover:underline" to={ROUTES.ADMIN_LOGIN}>
+                    Admin login
                   </Link>
                 </p>
               </div>

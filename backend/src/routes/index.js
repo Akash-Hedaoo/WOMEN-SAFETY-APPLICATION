@@ -7,5 +7,6 @@ router.use('/map', require('./mapRoutes'));
 router.use('/location', require('./locationRoutes'));
 router.use('/subscription', require('./subscriptionRoutes'));
 router.use('/news', require('./newsRoutes'));
+router.use('/complaints', require('./complaintRoutes'));
 
 module.exports = router;

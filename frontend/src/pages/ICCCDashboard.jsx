@@ -1,15 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, MapPin, AlertTriangle, Clock, CheckCircle2, Phone, Filter, Search, Eye, Radio, Lock, Key, Users, ArrowUpRight, Check, ShieldAlert, ExternalLink, MessageSquare } from 'lucide-react';
+import { Shield, MapPin, AlertTriangle, Clock, CheckCircle2, Phone, Filter, Search, Eye, Radio, Users, ArrowUpRight, Check, ShieldAlert, ExternalLink, MessageSquare } from 'lucide-react';
 import CustomMapContainer from '../components/Map/MapContainer';
 import { API_BASE_URL } from '../utils/constants';
 import io from 'socket.io-client';
 
 export default function ICCCDashboard() {
-  // Operator Access Control State (Fix #1)
-  const [passcode, setPasscode] = useState('');
-  const [isAuthorized, setIsAuthorized] = useState(false);
-  const [authError, setAuthError] = useState(null);
-
   // Incidents Data State
   const [incidents, setIncidents] = useState([]);
   const [activeFilter, setActiveFilter] = useState('ALL'); // ALL, ACTIVE, HIGH_THREAT, RESPONDING, RESOLVED
@@ -17,63 +12,55 @@ export default function ICCCDashboard() {
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [operatorNote, setOperatorNote] = useState('');
   const [toastMessage, setToastMessage] = useState(null);
-
-  // Initial Auth Check & Passcode verification
-  const handleAuthorize = (inputPasscode) => {
-    const code = inputPasscode || passcode;
-    const validCodes = ['COMMAND112', 'OPERATOR2026', 'SAFEERA2026'];
-    
-    if (validCodes.includes(code.trim())) {
-      setIsAuthorized(true);
-      setAuthError(null);
-      localStorage.setItem('iccc_passcode', code.trim());
-      fetchIncidents(code.trim());
-    } else {
-      setAuthError('Invalid operator passcode. Try COMMAND112 or OPERATOR2026.');
-    }
-  };
-
-  useEffect(() => {
-    const savedCode = localStorage.getItem('iccc_passcode');
-    if (savedCode) {
-      handleAuthorize(savedCode);
-    }
-  }, []);
+  const [complaints, setComplaints] = useState([]);
 
   // Fetch Incidents from Backend API
-  const fetchIncidents = async (authCode) => {
+  const fetchIncidents = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const res = await fetch(`${API_BASE_URL}/api/sos/iccc/incidents`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'x-iccc-passcode': authCode || passcode || 'COMMAND112',
-          'x-demo-operator': 'true'
+          'Authorization': `Bearer ${token}`
         }
       });
       const data = await res.json();
-      if (data.success && data.incidents && data.incidents.length > 0) {
-        setIncidents(data.incidents);
-      } else {
-        setIncidents(getMockIncidents());
-      }
+      if (!res.ok || !data.success) throw new Error(data.message || 'Unable to load ICCC incidents.');
+      setIncidents(data.incidents || []);
     } catch (err) {
-      console.warn('Backend ICCC fetch error, using live mock incidents:', err);
-      setIncidents(getMockIncidents());
+      console.warn('Backend ICCC fetch error:', err);
+      setIncidents([]);
     }
   };
 
+  const fetchComplaints = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/api/complaints`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Unable to load complaints.');
+      setComplaints(data.complaints || []);
+    } catch (error) {
+      console.warn('Complaint fetch error:', error);
+      setComplaints([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchIncidents();
+    fetchComplaints();
+  }, []);
+
   // Setup Socket Connection for Real-Time Updates
   useEffect(() => {
-    if (!isAuthorized) return;
-
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('authToken');
     const newSocket = io(API_BASE_URL || window.location.origin, {
       auth: { token }
     });
 
     newSocket.on('connect', () => {
-      newSocket.emit('joinICCC', { passcode: passcode || 'COMMAND112' });
+      newSocket.emit('joinICCC');
     });
 
     newSocket.on('iccc-new-incident', (newIncident) => {
@@ -87,8 +74,17 @@ export default function ICCCDashboard() {
       );
     });
 
+    newSocket.on('complaint-submitted', ({ complaint }) => {
+      setComplaints((previous) => [complaint, ...previous]);
+      showToast('New anonymous complaint received.');
+    });
+
+    newSocket.on('complaint-updated', ({ complaint }) => {
+      setComplaints((previous) => previous.map((item) => item._id === complaint._id ? complaint : item));
+    });
+
     return () => newSocket.disconnect();
-  }, [isAuthorized, passcode]);
+  }, []);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -129,14 +125,12 @@ export default function ICCCDashboard() {
 
     // 2. Asynchronous API sync to backend
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       await fetch(`${API_BASE_URL}/api/sos/iccc/incidents/${incidentId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'x-iccc-passcode': passcode || 'COMMAND112',
-          'x-demo-operator': 'true'
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ icccStatus: newStatus, note: operatorNote })
       });
@@ -145,50 +139,38 @@ export default function ICCCDashboard() {
     }
   };
 
-  // Helper Mock Data for demoing when DB is empty
-  const getMockIncidents = () => [
-    {
-      _id: 'inc-101',
-      userId: { name: 'Anushka Sharma', phone: '+91 9876543210' },
-      latitude: 28.6139,
-      longitude: 77.2090,
-      googleMapsLink: 'https://maps.google.com/?q=28.6139,77.2090',
-      triggerSource: 'threat_detection',
-      threatScore: 88,
-      threatDetails: { motionScore: 85, audioScore: 90, gpsScore: 82 },
-      status: 'active',
-      icccStatus: 'unassigned',
-      message: 'AUTOMATIC AI THREAT ESCALATION DETECTED',
-      createdAt: new Date(Date.now() - 3 * 60 * 1000).toISOString()
-    },
-    {
-      _id: 'inc-102',
-      userId: { name: 'Priya Verma', phone: '+91 9822334455' },
-      latitude: 28.6250,
-      longitude: 77.2180,
-      googleMapsLink: 'https://maps.google.com/?q=28.6250,77.2180',
-      triggerSource: 'voice_trigger',
-      threatScore: 65,
-      threatDetails: { triggerPhrase: 'help me now' },
-      status: 'active',
-      icccStatus: 'responding',
-      message: 'VOICE TRIGGERED EMERGENCY SOS ("help me now")',
-      createdAt: new Date(Date.now() - 12 * 60 * 1000).toISOString()
-    },
-    {
-      _id: 'inc-103',
-      userId: { name: 'Sneha Patel', phone: '+91 9711223344' },
-      latitude: 28.6010,
-      longitude: 77.1950,
-      googleMapsLink: 'https://maps.google.com/?q=28.6010,77.1950',
-      triggerSource: 'manual_button',
-      threatScore: 40,
-      status: 'resolved',
-      icccStatus: 'resolved',
-      message: 'I need immediate assistance!',
-      createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString()
+  const reviewComplaint = async (complaintId, status) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/api/complaints/${complaintId}/review`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Unable to review complaint.');
+      setComplaints((previous) => previous.map((item) => item._id === complaintId ? data.complaint : item));
+      showToast(`Complaint ${status}.`);
+    } catch (error) {
+      showToast(error.message || 'Unable to review complaint.');
     }
-  ];
+  };
+
+  const forwardComplaintToGovernmentDemo = async (complaintId) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/api/complaints/${complaintId}/send-to-government`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Unable to forward complaint.');
+      setComplaints((previous) => previous.map((item) => item._id === complaintId ? data.complaint : item));
+      showToast('Demo government-service forwarding recorded.');
+    } catch (error) {
+      showToast(error.message || 'Unable to forward complaint.');
+    }
+  };
 
   // Map markers from incidents (Fix #5: Map Component Reuse)
   const mapCenter = incidents.length > 0 ? [incidents[0].latitude, incidents[0].longitude] : [28.6139, 77.2090];
@@ -220,59 +202,6 @@ export default function ICCCDashboard() {
   const activeCount = incidents.filter((i) => i.status === 'active' && i.icccStatus !== 'resolved').length;
   const highThreatCount = incidents.filter((i) => (i.threatScore || 0) >= 75).length;
   const respondingCount = incidents.filter((i) => i.icccStatus === 'responding').length;
-
-  // Un-authorized Operator Gate Screen (Fix #1)
-  if (!isAuthorized) {
-    return (
-      <div className="page-shell min-h-screen pt-28 pb-12 flex items-center justify-center px-4">
-        <div className="max-w-md w-full rounded-3xl border border-[#DCDDD5] bg-white p-8 shadow-2xl text-center space-y-6">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FAF0EA] text-[#7A8E72] border border-[#DCDDD5]">
-            <Lock className="h-8 w-8" />
-          </div>
-
-          <div>
-            <h2 className="font-headline text-2xl font-bold text-[#28302A]">ICCC Command Room</h2>
-            <p className="text-xs text-[#687067] mt-2">
-              Integrated Command & Control Center is restricted to authorized authority liaisons & control operators.
-            </p>
-          </div>
-
-          {authError && (
-            <div className="p-3 rounded-2xl bg-[#C62828]/10 border border-[#C62828]/30 text-[#C62828] text-xs">
-              {authError}
-            </div>
-          )}
-
-          <div className="space-y-4 text-left">
-            <label className="text-xs font-semibold uppercase tracking-wider text-[#28302A]">
-              Enter Operator Passcode
-            </label>
-            <div className="relative">
-              <Key className="absolute left-4 top-3.5 h-4 w-4 text-[#687067]" />
-              <input
-                type="password"
-                placeholder="Passcode (e.g. COMMAND112)"
-                value={passcode}
-                onChange={(e) => setPasscode(e.target.value)}
-                className="w-full rounded-2xl border border-[#DCDDD5] bg-[#FAF8F5] pl-11 pr-4 py-3 text-sm text-[#28302A] placeholder-[#B8A99A] focus:border-[#7A8E72] focus:outline-none"
-              />
-            </div>
-
-            <button
-              onClick={() => handleAuthorize()}
-              className="w-full btn-primary justify-center py-3.5"
-            >
-              Access Command Center
-            </button>
-          </div>
-
-          <p className="text-[11px] text-[#687067] italic">
-            Demo passcodes: <code className="text-[#7A8E72] font-semibold">COMMAND112</code> or <code className="text-[#7A8E72] font-semibold">OPERATOR2026</code>
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="page-shell min-h-screen pt-28 pb-12 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-8">
@@ -365,6 +294,49 @@ export default function ICCCDashboard() {
           </div>
         </div>
       </div>
+
+      <section className="card-premium border border-[#DCDDD5] bg-white shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-[#DCDDD5] pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#C62828]/10 text-[#C62828]">
+              <MessageSquare className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#C62828]">Anonymous reporting queue</p>
+              <h2 className="font-headline text-xl font-semibold text-[#28302A]">Citizen complaints</h2>
+            </div>
+          </div>
+          <span className="text-xs font-semibold text-[#687067]">{complaints.filter((complaint) => complaint.status === 'submitted').length} awaiting review</span>
+        </div>
+        <p className="mt-4 text-xs leading-relaxed text-[#687067]">Reports contain no user name, phone, email, or account ID. Verify before using the demo forwarding action; it records a simulated hand-off and does not contact any government service.</p>
+
+        <div className="mt-5 space-y-3">
+          {complaints.length === 0 ? (
+            <p className="rounded-2xl bg-[#FAF8F5] p-5 text-sm text-[#687067]">No anonymous complaints have been submitted.</p>
+          ) : complaints.map((complaint) => (
+            <article key={complaint._id} className="rounded-2xl border border-[#DCDDD5] bg-[#FAF8F5] p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#7A8E72]">{complaint.category.replace('_', ' ')}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#28302A]">{complaint.message}</p>
+                  <p className="mt-2 text-[11px] text-[#687067]">Submitted {new Date(complaint.createdAt).toLocaleString()}</p>
+                  {complaint.governmentReference && <p className="mt-1 text-[11px] font-semibold text-[#7A8E72]">Demo reference: {complaint.governmentReference}</p>}
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${complaint.status === 'verified' ? 'bg-[#4F7D55]/15 text-[#37613D]' : complaint.status === 'rejected' ? 'bg-[#C62828]/10 text-[#B71C1C]' : complaint.status === 'forwarded' ? 'bg-[#7A8E72]/15 text-[#37613D]' : 'bg-[#C18A32]/15 text-[#956616]'}`}>
+                  {complaint.status}
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {complaint.status === 'submitted' && <>
+                  <button onClick={() => reviewComplaint(complaint._id, 'verified')} className="btn-primary text-xs">Verify complaint</button>
+                  <button onClick={() => reviewComplaint(complaint._id, 'rejected')} className="btn-secondary text-xs">Reject</button>
+                </>}
+                {complaint.status === 'verified' && <button onClick={() => forwardComplaintToGovernmentDemo(complaint._id)} className="btn-secondary text-xs">Send to government service (demo)</button>}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
       {/* Main Grid: Map (Fix #5 Reuse) & Incident List */}
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1.1fr]">

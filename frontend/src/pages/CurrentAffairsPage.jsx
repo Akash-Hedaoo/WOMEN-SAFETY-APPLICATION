@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Calendar, ChevronLeft, ChevronRight, ExternalLink, Info, Loader2, MapPin, RefreshCw, Share2, ShieldAlert } from 'lucide-react';
+import { API_BASE_URL } from '../utils/constants';
 
 const RISK_STYLES = {
   high: { badge: 'border-[#C62828]/30 bg-[#C62828]/10 text-[#B71C1C]', icon: AlertTriangle, accent: 'border-l-[#C62828]' },
@@ -25,7 +26,7 @@ export default function CurrentAffairsPage() {
     refresh ? setIsRefreshing(true) : setIsLoading(true);
     setError('');
     try {
-      const response = await fetch(`/api/news${refresh ? '?refresh=true' : ''}`);
+      const response = await fetch(`${API_BASE_URL}/api/news${refresh ? '?refresh=true' : ''}`);
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || 'Unable to load live news');
       setArticles(data.articles || []);

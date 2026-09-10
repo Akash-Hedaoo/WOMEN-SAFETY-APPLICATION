@@ -5,6 +5,7 @@ import {
   Bell,
   CheckCircle2,
   Clock,
+  FileText,
   Leaf,
   MapPin,
   Shield,
@@ -15,6 +16,7 @@ import { useAuth } from '../hooks/useAuth';
 import CustomMapContainer from '../components/Map/MapContainer';
 import StatusCard from '../components/Dashboard/StatusCard';
 import { getBestAvailablePosition } from '../services/locationService';
+import { API_BASE_URL } from '../utils/constants';
 
 const AnimatedCounter = ({ label, target, duration = 1.2, icon: Icon, tone }) => {
   const [count, setCount] = useState(0);
@@ -56,6 +58,10 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [isSafe, setIsSafe] = useState(true);
   const [mapLocation, setMapLocation] = useState([28.6139, 77.2090]);
+  const [complaintCategory, setComplaintCategory] = useState('other');
+  const [complaintMessage, setComplaintMessage] = useState('');
+  const [complaintStatus, setComplaintStatus] = useState('');
+  const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
 
   useEffect(() => {
     getBestAvailablePosition()
@@ -70,6 +76,32 @@ export default function Dashboard() {
     { title: 'Safety check-in', time: 'Yesterday', location: 'Begumpet' },
     { title: 'Guardian contact added', time: '2 days ago', location: 'System' },
   ];
+
+  const submitAnonymousComplaint = async (event) => {
+    event.preventDefault();
+    setComplaintStatus('');
+    setIsSubmittingComplaint(true);
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/api/complaints`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ category: complaintCategory, message: complaintMessage })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || 'Unable to submit complaint.');
+      setComplaintMessage('');
+      setComplaintStatus('Submitted anonymously to the ICCC review queue.');
+    } catch (error) {
+      setComplaintStatus(error.message || 'Unable to submit complaint.');
+    } finally {
+      setIsSubmittingComplaint(false);
+    }
+  };
 
   return (
     <div className="page-shell mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
@@ -101,6 +133,50 @@ export default function Dashboard() {
         <AnimatedCounter label="Alerts triggered" target={0} icon={Bell} tone="bg-[#C62828]/15 text-[#C62828]" />
         <AnimatedCounter label="Verified guardians" target={3} icon={Users} tone="bg-[#E8C4B8]/30 text-[#28302A]" />
       </div>
+
+      <section className="mt-8 rounded-[24px] border border-[#DCDDD5] bg-white p-6 shadow-sm md:p-8">
+        <div className="grid gap-6 lg:grid-cols-[1fr_1.25fr] lg:items-start">
+          <div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C62828]/10 text-[#C62828]">
+              <FileText className="h-6 w-6" />
+            </div>
+            <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#C62828]">Anonymous reporting</p>
+            <h2 className="mt-2 font-headline text-2xl font-semibold text-[#28302A]">Report a safety concern</h2>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-[#687067]">
+              Your complaint is sent to the ICCC review queue without your name, phone number, email, or account ID in the complaint record. Do not include personal details in your message.
+            </p>
+          </div>
+
+          <form onSubmit={submitAnonymousComplaint} className="space-y-4">
+            <label className="block">
+              <span className="premium-label">Concern type</span>
+              <select className="premium-input" value={complaintCategory} onChange={(event) => setComplaintCategory(event.target.value)}>
+                <option value="harassment">Harassment</option>
+                <option value="unsafe_area">Unsafe area</option>
+                <option value="stalking">Stalking</option>
+                <option value="service_failure">Safety service issue</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="premium-label">Complaint</span>
+              <textarea
+                className="premium-input min-h-32 resize-y"
+                placeholder="Describe the safety concern without adding your personal contact details."
+                value={complaintMessage}
+                onChange={(event) => setComplaintMessage(event.target.value)}
+                minLength={10}
+                maxLength={2000}
+                required
+              />
+            </label>
+            {complaintStatus && <p className="text-sm text-[#687067]" role="status">{complaintStatus}</p>}
+            <button className="btn-primary" type="submit" disabled={isSubmittingComplaint}>
+              {isSubmittingComplaint ? 'Submitting…' : 'Submit anonymous complaint'}
+            </button>
+          </form>
+        </div>
+      </section>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-3">
         <section className="lg:col-span-2">

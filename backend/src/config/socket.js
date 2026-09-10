@@ -45,7 +45,7 @@ const initSocket = (httpServer) => {
     if (!token) return next(new Error('Authentication required'));
     try {
       const decoded = jwt.verify(token, accessTokenSecret);
-      const user = await User.findById(decoded.userId).select('name phone');
+      const user = await User.findById(decoded.userId).select('name phone email role');
       if (!user) return next(new Error('User not found'));
       socket.userId = decoded.userId;
       socket.user = user;
@@ -66,19 +66,8 @@ const initSocket = (httpServer) => {
     });
 
     // ICCC Control Room Operator joining global command room
-    socket.on('joinICCC', (payload) => {
-      const passcode = payload?.passcode;
-      const validPasscodes = ['COMMAND112', 'OPERATOR2026', process.env.ICCC_PASSCODE].filter(Boolean);
-      const allowedEmails = (process.env.ICCC_OPERATOR_EMAILS || 'admin@safeera.org,operator@safeera.org,command@safeera.org')
-        .split(',')
-        .map(e => e.trim().toLowerCase());
-
-      const isAuthorized = (passcode && validPasscodes.includes(passcode.trim())) ||
-                           (socket.user?.email && allowedEmails.includes(socket.user.email.toLowerCase())) ||
-                           (socket.user?.role === 'admin' || socket.user?.role === 'operator') ||
-                           (process.env.NODE_ENV !== 'production');
-
-      if (isAuthorized) {
+    socket.on('joinICCC', () => {
+      if (socket.user?.role === 'admin') {
         socket.join('iccc_room');
         socket.emit('iccc-joined', { success: true, message: 'Connected to ICCC Command Stream' });
         console.log(`Operator ${socket.user?.name || socket.id} joined iccc_room`);

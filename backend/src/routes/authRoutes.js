@@ -5,6 +5,7 @@ const {
   verifyEmail,
   resendOTP,
   login,
+  adminLogin,
   googleLogin,
   refreshAccessToken,
   forgotPassword,
@@ -21,6 +22,7 @@ router.post('/register', register);
 router.post('/verify-email', verifyEmail);
 router.post('/resend-otp', resendOTP);
 router.post('/login', login);
+router.post('/admin/login', adminLogin);
 router.post('/google', googleLogin);
 router.post('/refresh-token', refreshAccessToken);
 router.post('/forgot-password', forgotPassword);

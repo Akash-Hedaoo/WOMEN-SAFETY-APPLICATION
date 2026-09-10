@@ -17,7 +17,7 @@ cd backend
 npm install
 npm run dev
 ```
-
+I’ll make the login separation strict in both directions, then add an anonymous complaint workflow: user submission on Dashboard, Admin/ICCC review, verification/rejection, and a clearly marked demo “send to government service” action.
 ```bash
 cd frontend
 npm install

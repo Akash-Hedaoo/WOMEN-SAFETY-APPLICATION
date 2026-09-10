@@ -171,6 +171,14 @@ const login = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
+    if (user.role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        requiresAdminLogin: true,
+        message: 'Admin accounts must use the Admin login page.'
+      });
+    }
+
     // Check account lock
     if (user.isLocked()) {
       return res.status(423).json({ success: false, message: 'Account temporarily locked. Try again in 15 minutes.' });
@@ -225,6 +233,69 @@ const login = async (req, res) => {
   }
 };
 
+// ─── Admin login ───────────────────────────────────────────────────────────
+// Admin credentials live only in environment variables. This prevents a
+// normal user account or a frontend passcode from granting ICCC access.
+const adminLogin = async (req, res) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const adminEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+    const adminPassword = String(process.env.ADMIN_PASSWORD || '');
+
+    if (!adminEmail || !adminPassword) {
+      return res.status(503).json({
+        success: false,
+        message: 'Admin login is not configured. Set ADMIN_EMAIL and ADMIN_PASSWORD on the server.'
+      });
+    }
+
+    if (email !== adminEmail || password !== adminPassword) {
+      return res.status(401).json({ success: false, message: 'Invalid admin credentials' });
+    }
+
+    let admin = await User.findOne({ email: adminEmail });
+    if (!admin) {
+      admin = new User({
+        name: 'Admin',
+        email: adminEmail,
+        phone: '9999999999',
+        password: adminPassword,
+        emailVerified: true,
+        role: 'admin'
+      });
+    } else if (admin.role !== 'admin') {
+      return res.status(409).json({
+        success: false,
+        message: 'The configured Admin email is already assigned to a user account. Choose a different ADMIN_EMAIL.'
+      });
+    }
+
+    admin.loginAttempts = 0;
+    admin.lockUntil = null;
+    admin.lastLogin = new Date();
+
+    const accessToken = generateAccessToken(admin._id);
+    const refreshToken = generateRefreshToken(admin._id);
+    admin.refreshToken = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    await admin.save();
+
+    return res.status(200).json({
+      success: true,
+      accessToken,
+      refreshToken,
+      user: {
+        _id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+};
+
 // ── Google Login ─────────────────────────────────────────────────────
 const googleLogin = async (req, res) => {
   try {
@@ -243,6 +314,10 @@ const googleLogin = async (req, res) => {
     const { sub: googleId, email, name, picture } = payload;
 
     let user = await User.findOne({ email });
+
+    if (user?.role === 'admin' || email.toLowerCase() === String(process.env.ADMIN_EMAIL || '').toLowerCase()) {
+      return res.status(403).json({ success: false, message: 'Admin accounts must use the Admin login page.', requiresAdminLogin: true });
+    }
 
     if (!user) {
       // Create a new user for Google login
@@ -488,6 +563,7 @@ module.exports = {
   verifyEmail,
   resendOTP,
   login,
+  adminLogin,
   googleLogin,
   refreshAccessToken,
   forgotPassword,

@@ -34,8 +34,10 @@ export const useAuth = () => {
 
     const logout = () => {
         localStorage.removeItem('authToken');
+        localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('refreshToken');
+        localStorage.removeItem('iccc_passcode');
         setUser(null);
     };
 
