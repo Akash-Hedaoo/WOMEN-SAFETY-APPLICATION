@@ -57,7 +57,7 @@ async function openSmsComposer(recipient, message) {
  */
 export function buildEmergencyMessage({ latitude, longitude, otp, mapsUrl, status = 'offline' }) {
   const hasCoordinates = Number.isFinite(latitude) && Number.isFinite(longitude);
-  const locationLabel = status === 'online' ? '📍 Location' : '📍 Last known location';
+  const locationLabel = status === 'online' ? '📍 Current location' : '📍 Last known location';
   const location = hasCoordinates ? mapsUrl : 'Location unavailable';
   const statusLine = status === 'online'
     ? '📡 Status: Online'

@@ -18,7 +18,7 @@ const toE164IndianNumber = (phoneNumber) => {
 const sendSMSToGuardian = async (guardian, alertData) => {
   const hasCoordinates = Number.isFinite(alertData.latitude) && Number.isFinite(alertData.longitude);
   const isOffline = alertData.smsStatus === 'offline';
-  const locationLabel = isOffline ? '📍 Last known location' : '📍 Location';
+  const locationLabel = isOffline ? '📍 Last known location' : '📍 Current location';
   const location = hasCoordinates ? alertData.googleMapsLink : 'Location unavailable';
   const statusLine = isOffline
     ? '⚠️ Her device is currently offline. This alert was sent directly via SMS.'

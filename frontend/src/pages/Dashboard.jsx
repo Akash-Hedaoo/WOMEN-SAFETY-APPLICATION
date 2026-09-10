@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   ArrowUpRight,
   Bell,
@@ -56,6 +56,8 @@ const AnimatedCounter = ({ label, target, duration = 1.2, icon: Icon, tone }) =>
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') === 'complaints' ? 'complaints' : 'overview';
   const [isSafe, setIsSafe] = useState(true);
   const [mapLocation, setMapLocation] = useState([28.6139, 77.2090]);
   const [complaintCategory, setComplaintCategory] = useState('other');
@@ -103,6 +105,10 @@ export default function Dashboard() {
     }
   };
 
+  const selectTab = (tab) => {
+    setSearchParams(tab === 'complaints' ? { tab: 'complaints' } : {});
+  };
+
   return (
     <div className="page-shell mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -124,17 +130,42 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <div className="mb-6">
-        <StatusCard isSafe={isSafe} />
+      <div className="mb-8 flex flex-wrap gap-2 rounded-2xl border border-[#DCDDD5] bg-white p-2 shadow-sm" role="tablist" aria-label="Dashboard sections">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'overview'}
+          onClick={() => selectTab('overview')}
+          className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === 'overview' ? 'bg-[#7A8E72] text-white' : 'text-[#687067] hover:bg-[#FAF8F5] hover:text-[#28302A]'}`}
+        >
+          Overview
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'complaints'}
+          onClick={() => selectTab('complaints')}
+          className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === 'complaints' ? 'bg-[#C62828] text-white' : 'text-[#687067] hover:bg-[#FAF8F5] hover:text-[#28302A]'}`}
+        >
+          Anonymous complaints
+        </button>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-3">
-        <AnimatedCounter label="Safe days" target={42} icon={Shield} tone="bg-[#A8B8A0]/20 text-[#7A8E72]" />
-        <AnimatedCounter label="Alerts triggered" target={0} icon={Bell} tone="bg-[#C62828]/15 text-[#C62828]" />
-        <AnimatedCounter label="Verified guardians" target={3} icon={Users} tone="bg-[#E8C4B8]/30 text-[#28302A]" />
-      </div>
+      {activeTab === 'overview' && (
+        <>
+          <div className="mb-6">
+            <StatusCard isSafe={isSafe} />
+          </div>
 
-      <section className="mt-8 rounded-[24px] border border-[#DCDDD5] bg-white p-6 shadow-sm md:p-8">
+          <div className="grid gap-5 md:grid-cols-3">
+            <AnimatedCounter label="Safe days" target={42} icon={Shield} tone="bg-[#A8B8A0]/20 text-[#7A8E72]" />
+            <AnimatedCounter label="Alerts triggered" target={0} icon={Bell} tone="bg-[#C62828]/15 text-[#C62828]" />
+            <AnimatedCounter label="Verified guardians" target={3} icon={Users} tone="bg-[#E8C4B8]/30 text-[#28302A]" />
+          </div>
+        </>
+      )}
+
+      {activeTab === 'complaints' && <section className="rounded-[24px] border border-[#DCDDD5] bg-white p-6 shadow-sm md:p-8">
         <div className="grid gap-6 lg:grid-cols-[1fr_1.25fr] lg:items-start">
           <div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#C62828]/10 text-[#C62828]">
@@ -176,9 +207,9 @@ export default function Dashboard() {
             </button>
           </form>
         </div>
-      </section>
+      </section>}
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+      {activeTab === 'overview' && <div className="mt-8 grid gap-6 lg:grid-cols-3">
         <section className="lg:col-span-2">
           <div className="card-premium overflow-hidden p-0">
             <div className="flex items-center justify-between border-b border-[#DCDDD5] px-6 py-5">
@@ -237,7 +268,7 @@ export default function Dashboard() {
           </div>
           <button className="btn-secondary mt-6 w-full justify-center">View all history</button>
         </section>
-      </div>
+      </div>}
     </div>
   );
 }

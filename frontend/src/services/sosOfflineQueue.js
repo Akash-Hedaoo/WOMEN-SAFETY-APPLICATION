@@ -43,8 +43,9 @@ function saveQueue(queue) {
  *   timestamp: string,
  *   triggerSource: string,
  *   message: string,
- *   smsStatus: 'compose_opened'|'partial'|'failed'|'unavailable',
+ *   smsStatus: 'offline'|'online'|'compose_opened'|'partial'|'failed'|'unavailable',
  *   smsDetails: Array,
+ *   deviceSmsSent?: boolean,
  *   backendSynced: boolean
  * }} sosRecord
  */
@@ -89,7 +90,7 @@ export function markSynced(clientSosId) {
 /**
  * Update the SMS status of a queued record.
  * @param {string} clientSosId
- * @param {string} smsStatus — 'compose_opened'|'partial'|'failed'|'unavailable'
+ * @param {string} smsStatus — 'offline'|'online'|'compose_opened'|'partial'|'failed'|'unavailable'
  * @param {Array} smsDetails — per-guardian results
  */
 export function updateSmsStatus(clientSosId, smsStatus, smsDetails) {

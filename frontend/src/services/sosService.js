@@ -5,7 +5,7 @@
  * Offline: GPS → OTP → native SMS composer → queue for backend sync
  * No signal: GPS (cached) → OTP → queue locally → retry on reconnect
  */
-import { getBestAvailablePosition } from './locationService';
+import { getCurrentPosition, getLastKnownPosition } from './locationService';
 import { isOnline, addConnectivityListener } from './networkService';
 import { getEmergencyCachedGuardians, syncGuardians } from './guardianCacheService';
 import { buildEmergencyMessage, sendToAllGuardians, isSmsAvailable } from './nativeSmsService';
@@ -92,10 +92,19 @@ export async function triggerSOS(options = {}) {
   const user = getStoredUser();
   const token = getAuthToken();
 
+  // Determine connectivity before reading GPS. Online SOS must request a
+  // fresh GPS fix; offline SOS must use only the saved last-known location.
+  let online = false;
+  try {
+    online = await isOnline();
+  } catch (error) {
+    console.warn('[SOS] Could not determine network state:', error);
+  }
+
   // Step 1: Get location
   let location = null;
   try {
-    location = await getBestAvailablePosition();
+    location = online ? await getCurrentPosition() : getLastKnownPosition();
     if (location) {
       steps.push({
         step: 'Location',
@@ -123,15 +132,6 @@ export async function triggerSOS(options = {}) {
 
   // Step 2: OTP generated
   steps.push({ step: 'OTP', status: 'success', detail: `Emergency OTP: ${otp}` });
-
-  // Determine connectivity before composing the guardian message so the
-  // message accurately identifies an online or offline SOS.
-  let online = false;
-  try {
-    online = await isOnline();
-  } catch (error) {
-    console.warn('[SOS] Could not determine network state:', error);
-  }
 
   // Send via the phone's SIM before attempting the server. This keeps device
   // SMS working even when the backend has no SMS-provider credentials.
@@ -285,8 +285,11 @@ export async function triggerSOS(options = {}) {
       timestamp: new Date().toISOString(),
       triggerSource,
       message,
-      smsStatus: smsResult.sent > 0 ? 'sent_from_device' : smsResult.opened > 0 ? 'compose_opened' : 'failed',
+      // Preserve the offline message/location semantics if this alert is
+      // synchronized later. The detailed delivery result is stored separately.
+      smsStatus: 'offline',
       smsDetails: smsResult.results,
+      deviceSmsSent: smsResult.sent > 0,
       backendSynced: false,
     });
 
@@ -371,8 +374,8 @@ export async function syncPendingSOS() {
           otp: record.otp,
           locationType: record.locationType,
           smsStatus: record.smsStatus === 'offline' ? 'offline' : 'online',
-          deliveryMethod: record.smsStatus === 'compose_opened' ? 'offline_sms' : 'pending',
-          deliveryStatus: 'pending',
+          deliveryMethod: record.deviceSmsSent ? 'device_sms' : 'pending',
+          deliveryStatus: record.deviceSmsSent ? 'sent_from_device' : 'pending',
         }),
       });
 
